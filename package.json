@@ -14,8 +14,12 @@
   "author": "Saul Johnson <saul.a.johnson@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "coffee": "^3.2.1",
     "commander": "^2.9.0",
     "request": "^2.72.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "codo": "^2.1.0",
+    "coffeelint": "^1.15.7"
+  }
 }
