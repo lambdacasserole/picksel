@@ -1,0 +1,10 @@
+{
+	"directory": "images",
+	"images": [
+		{
+			"id": 666927,
+			"resolution": 1,
+			"destination": "image1.jpg"
+		}
+	]
+}

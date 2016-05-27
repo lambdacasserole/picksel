@@ -1,0 +1,21 @@
+{
+  "name": "picksel",
+  "version": "1.0.0",
+  "description": "Asset manager for pulling down Pixabay images.",
+  "main": "picksel.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "asset",
+    "manager",
+    "pixabay"
+  ],
+  "author": "Saul Johnson <saul.a.johnson@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^2.9.0",
+    "request": "^2.72.0"
+  },
+  "devDependencies": {}
+}
