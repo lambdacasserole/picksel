@@ -2,14 +2,14 @@
     "directory": "images",
     "images": [
         {
-            "id": "666927",
-            "resolution": "tiny",
+            "id": "bb4b32cd96264150",
+            "resolution": 3,
             "destination": "test.jpg"
         },
         {
-            "id": "1000",
-            "resolution": "tiny",
-            "destination": "test.jpg"
+            "id": "bb4b3acd9a2c4050",
+            "resolution": 4,
+            "destination": "full.jpg"
         }
     ]
 }

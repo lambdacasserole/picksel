@@ -73,15 +73,24 @@ download = (id, resolution, destination) ->
     + (if resolution > 1 then '&response_group=high_resolution' else '') \
     + '&id=' \
     + id
+  
+  log.info 'Requesting information for image with ID ' \
+    + id \
+    + ' from ' \
+    + url
     
   # Request JSON from Pixabay.
   options =
     url: url
     json: true
   request options, (error, response, body) ->
-    file = fs.createWriteStream destination
-    req = https.get body.hits[0][resolutions[resolution]], (res) ->
-      res.pipe file
+    if !body.hits
+      log.error 'Couldn\'t get information about image ' \
+        + id
+    else
+      file = fs.createWriteStream destination
+      req = https.get body.hits[0][resolutions[resolution]], (res) ->
+        res.pipe file
 
       
 # Installs a single image.
@@ -129,6 +138,11 @@ add = (args) ->
   config.images.push image
   
   persistConfig() # Update configuration file.
+  
+  log.info 'Added image with ID ' \
+    + image.id \
+    + ' as asset.'
+  
   install() # Freshly install all images.
      
      
