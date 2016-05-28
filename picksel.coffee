@@ -15,7 +15,7 @@ config = jsonfile.readFileSync './picksel.json'
 
 # Initialize logging
 Log = require 'log-color-optionaldate'
-logSettings = 
+logSettings =
   level: 'debug'
   color: true
   date: false
@@ -55,7 +55,7 @@ getResolutionCode = (res) -> humanResolutions.indexOf res
 # Persists the currently loaded configuration settings
 #
 persistConfig = () ->
-  options = 
+  options =
     spaces: 4
   jsonfile.writeFileSync './picksel.json', config, options
 
@@ -98,7 +98,7 @@ download = (id, resolution, destination) ->
 # @param [Object] image the image to grab
 grab = (image) ->
   path = './' + config.directory + '/' + image.destination
-  log.info 'Installing image with ID ' \ 
+  log.info 'Installing image with ID ' \
     + image.id \
     + ' at resolution \'' \
     + humanResolutions[image.resolution] \
@@ -116,7 +116,7 @@ install = () -> grab image for image in config.images
 # Adds an image as an asset.
 #
 # @param [Object] args the arguments to the program
-# 
+#
 add = (args) ->
   # Check ID.
   id = args[3]
@@ -146,7 +146,25 @@ add = (args) ->
   install() # Freshly install all images.
      
      
+# Removes an image from installed assets.
+#
+# @param [Object] args the arguments to the program
+#
+remove = (args) ->
+  id = args[3]
+  images = config.images
+  filteredImages = images.filter (obj) -> obj.id != args[3]
+  if images.length == filteredImages.length
+    log.warning 'Couldn\'t uninstall image with ID ' \
+      + id \
+      + ' becuse it\'s not installed in the first place.'
+  else
+    config.images = filteredImages
+    persistConfig()
+     
+     
 # Interpret commands.
 switch process.argv[2]
   when 'install' then install()
   when 'add' then add process.argv
+  when 'remove' then remove process.argv
