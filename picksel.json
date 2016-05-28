@@ -1,10 +1,15 @@
 {
-	"directory": "images",
-	"images": [
-		{
-			"id": 666927,
-			"resolution": 1,
-			"destination": "image1.jpg"
-		}
-	]
+    "directory": "images",
+    "images": [
+        {
+            "id": "666927",
+            "resolution": "tiny",
+            "destination": "test.jpg"
+        },
+        {
+            "id": "1000",
+            "resolution": "tiny",
+            "destination": "test.jpg"
+        }
+    ]
 }
