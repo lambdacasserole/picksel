@@ -80,16 +80,15 @@ isValidResolution = (res) -> humanResolutions.indexOf(res) > -1
 # Gets the code for a human-readable resolution name.
 #
 # @param [String] res the human-readable resolution name to get the code for
+#
 getResolutionCode = (res) -> humanResolutions.indexOf res
 
 
-getReader = () =>
-  readlineSettings =
-    input: process.stdin
-    output: process.stdout
-  readline.createInterface readlineSettings
-
-
+# Persists an object to a file as JSON.
+#
+# @param [Object] obj the object to persist
+# @param [String] filename the name of the file to persist to
+#
 persist = (obj, filename) ->
   options =
     spaces: 4
@@ -101,6 +100,8 @@ persist = (obj, filename) ->
 persistConfig = () -> persist configPath, config
 
 
+# Persists the currently loaded user settings.
+#
 persistUser = () -> persist userPath, user
 
     
@@ -138,6 +139,7 @@ download = (id, resolution, destination) ->
     
     # On success.
     if isSuccessful error, body
+      # Get URL of image at correct resolution.
       url = body.hits[0][resolutions[resolution]]
       
       log.info "Downloading image file from '#{url}'"
@@ -193,11 +195,7 @@ install = () -> grab image for image in config.images
 # @param [Object] args the arguments to the program
 #
 add = (args) ->
-  # Check ID.
   id = args[3]
-#  if !isValidId id
-#    log.error "That ID '#{id}' isn't valid."
-#    return false
    
   # Check resolution.
   res = args[4]
@@ -254,6 +252,8 @@ loadConfig = () ->
   true
      
     
+# Walks the user through initializing their dependency file.
+#
 init = () ->
   
   # Check we're not going to overwrite an existing project file.
@@ -272,16 +272,21 @@ init = () ->
     + ' would you like to store assets? '
   newConfig.directory = directory
   
+  # Persist config file.
   config = newConfig
   persistConfig()
+  
+  log.info "New file created at '#{configPath}' for holding your" \
+    + ' asset dependencies. Feel free to check this file in to source control.'
     
-    
+ 
+# Walks the user through initializing their user file.
 auth = () ->
   
   # Check we're not going to overwrite an existing project file.
   if existsFile.sync userPath
     log.warning 'Looks like authentication is already set up for this project.'
-      return false
+    return false
     
   newUser =
     apiKey: ''
@@ -291,12 +296,14 @@ auth = () ->
   apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
     + ' can log in to the Pixabay website and visit: ' \
     + 'https://pixabay.com/api/docs/ '
-    
-  # TODO: Test API key.
-    
   newUser.apiKey = apiKey
   
+  # Persist user file.
   user = newUser
+  persistUser()
+  
+  log.info "New file created at '#{userPath}' containing your API key. DON'T" \
+    + " CHECK THIS FILE IN TO SOURCE CONTROL."
   
     
 # Interpret commands.
