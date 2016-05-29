@@ -48,6 +48,9 @@ humanResolutions = [
 ]
 
 
+redactApiKey = (url) -> url.replace user.apiKey, '[NOPE]'
+
+
 # Builds a URL for downloading image information.
 #
 # @param [String] apiKey the API key to use for the request
@@ -83,6 +86,19 @@ persistConfig = () ->
   jsonfile.writeFileSync './picksel.json', config, options
 
     
+# Returns true if a request to the Pixabay API was successful.
+#
+# @param [Object] error any error returned with the response
+# @param [Object] body the body of the response
+#
+isSuccessful = (error, body) -> 
+  !error \
+  && body \
+  && body.hits \
+  && body.hits instanceof Array \
+  && body.hits.length > 0
+  
+    
 # Downloads an image.
 #
 # @param [String] id the Pixabay image ID
@@ -93,24 +109,23 @@ download = (id, resolution, destination) ->
   # Build URL for API request.
   url = buildUrl(user.apiKey, id, resolution)
   
-  log.info 'Requesting information for image with ID ' \
-    + id \
+  log.info 'Requesting information for image' \
     + ' from ' \
-    + url
+    + redactApiKey url
     
-  # Call out to Pixabay.
   options =
     url: url
     json: true
+    
+  # Call out to Pixabay.
   request options, (error, response, body) ->
-    if error || !body || !body.hits
-      log.error 'Couldn\'t get information about image with ID \'' \
-        + id \
-        + '\''
-    else
+    
+    # On success.
+    if isSuccessful error, body
       url = body.hits[0][resolutions[resolution]]
-      log.info 'Downloading file from ' \
-        + url
+      log.info 'Downloading file from \'' \
+        + url \
+        + '\'...'
       tempDestination = destination + '.pickseltemp'
       file = fs.createWriteStream tempDestination
       req = https.get url, (response) ->
@@ -130,8 +145,12 @@ download = (id, resolution, destination) ->
               log.info 'Finished installing image with ID \'' \
                 + id \
                 + '\''
+    else
+      # Download failed.
+      log.error 'Couldn\'t get information about image with ID \'' \
+        + id \
+        + '\''
         
-
       
 # Installs a single image.
 #
@@ -160,28 +179,28 @@ install = () -> grab image for image in config.images
 add = (args) ->
   # Check ID.
   id = args[3]
-  if !isValidId
+  if !isValidId id
     log.error 'That ID \'' + id + '\' isn\'t valid.'
     return false
    
   # Check resolution.
   res = args[4]
-  if !isValidResolution(res)
+  if !isValidResolution res
     log.error 'That resolution \'' + res + '\' isn\'t valid.'
     return false
   
   # Add new image to configuration file.
   image =
     id: id
-    resolution: getResolutionCode(res)
+    resolution: getResolutionCode res
     destination: args[5]
   config.images.push image
   
   persistConfig() # Update configuration file.
   
-  log.info 'Added image with ID ' \
+  log.info 'Added image with ID \'' \
     + image.id \
-    + ' as asset.'
+    + '\' as asset.'
   
   install() # Freshly install all images.
      
