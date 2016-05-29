@@ -104,7 +104,7 @@ download = (id, resolution, destination) ->
         + id \
         + '\''
     else
-      url = body.hits[0][resolutions[resolution]];
+      url = body.hits[0][resolutions[resolution]]
       log.info 'Downloading file from ' \
         + url
       file = fs.createWriteStream destination
