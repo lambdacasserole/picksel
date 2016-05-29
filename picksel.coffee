@@ -6,6 +6,10 @@ fs = require 'fs'
 # Load third party dependencies.
 request = require 'request'
 jsonfile = require 'jsonfile'
+existsFile = require 'exists-file'
+md5File = require 'md5-file'
+filedel = require 'filedel'
+fileMove = require 'file-move'
 
 
 # Load config files.
@@ -107,9 +111,26 @@ download = (id, resolution, destination) ->
       url = body.hits[0][resolutions[resolution]]
       log.info 'Downloading file from ' \
         + url
-      file = fs.createWriteStream destination
+      tempDestination = destination + '.pickseltemp'
+      file = fs.createWriteStream tempDestination
       req = https.get url, (response) ->
-        response.pipe file
+        stream = response.pipe file
+        stream.on 'finish', () ->
+          if existsFile.sync(destination) && md5File.sync(tempDestination) != md5File.sync(destination)
+            log.warning 'Looks like \'' \
+              + destination \
+              + '\' has been modified (MD5 hashes ' \
+              + md5File.sync(tempDestination) \
+              + ', ' \
+              + md5File.sync(destination) \
+              + ') so not gonna overwrite it.'
+            filedel tempDestination
+          else
+            fileMove tempDestination, destination, (err) ->
+              log.info 'Finished installing image with ID \'' \
+                + id \
+                + '\''
+        
 
       
 # Installs a single image.

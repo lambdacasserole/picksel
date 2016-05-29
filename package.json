@@ -16,8 +16,12 @@
   "dependencies": {
     "coffee": "^3.2.1",
     "commander": "^2.9.0",
+    "exists-file": "^2.0.0",
+    "file-move": "0.0.3",
+    "filedel": "^2.0.1",
     "jsonfile": "^2.3.1",
     "log-color-optionaldate": "^1.1.0",
+    "md5-file": "^3.1.0",
     "request": "^2.72.0"
   },
   "devDependencies": {
