@@ -10,11 +10,14 @@ existsFile = require 'exists-file'
 md5File = require 'md5-file'
 filedel = require 'filedel'
 fileMove = require 'file-move'
+readline = require 'readline-sync'
 
 
-# Load config files.
-user = jsonfile.readFileSync './.pickselacc'
-config = jsonfile.readFileSync './picksel.json'
+# Space for config files.
+userPath = './.pickselacc'
+user = null
+configPath = './picksel.json'
+config = null
 
 
 # Initialize logging
@@ -80,12 +83,25 @@ isValidResolution = (res) -> humanResolutions.indexOf(res) > -1
 getResolutionCode = (res) -> humanResolutions.indexOf res
 
 
-# Persists the currently loaded configuration settings
-#
-persistConfig = () ->
+getReader = () =>
+  readlineSettings =
+    input: process.stdin
+    output: process.stdout
+  readline.createInterface readlineSettings
+
+
+persist = (obj, filename) ->
   options =
     spaces: 4
-  jsonfile.writeFileSync './picksel.json', config, options
+  jsonfile.writeFileSync filename, obj, options
+  
+  
+# Persists the currently loaded configuration settings
+#
+persistConfig = () -> persist configPath, config
+
+
+persistUser = () -> persist userPath, user
 
     
 # Returns true if a request to the Pixabay API was successful.
@@ -218,9 +234,79 @@ remove = (args) ->
     config.images = filteredImages
     persistConfig()
      
+      
+# Attempts to load the user and dependency configuration files.
+#
+loadConfig = () ->
+  if existsFile.sync userPath
+    user = jsonfile.readFileSync userPath
+  else
+    log.error "Couldn't find your '#{userPath}' file to get your API key." \
+      + ' You should probably run \'picksel auth\' to set one up.'
+    return false
+  if existsFile.sync configPath
+    config = jsonfile.readFileSync configPath
+  else
+    log.error "Couldn't find your #{configPath} file with all your" \
+      + ' dependencies. You should probably run \'picksel init\' to set one' \
+      + ' up.'
+    return false
+  true
      
+    
+init = () ->
+  
+  # Check we're not going to overwrite an existing project file.
+  if existsFile.sync configPath
+    log.warning 'Looks like this project has already been initialized for' \
+      + ' Picksel.'
+      return false
+    
+  newConfig =
+    directory: ''
+    images: []
+    
+  console.log 'Let\'s initialize Picksel for this project...'
+  
+  directory = readline.question 'Relative to the current directory, where' \
+    + ' would you like to store assets? '
+  newConfig.directory = directory
+  
+  config = newConfig
+  persistConfig()
+    
+    
+auth = () ->
+  
+  # Check we're not going to overwrite an existing project file.
+  if existsFile.sync userPath
+    log.warning 'Looks like authentication is already set up for this project.'
+      return false
+    
+  newUser =
+    apiKey: ''
+    
+  console.log 'Picksel needs your API key in order to work...'
+  
+  apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
+    + ' can log in to the Pixabay website and visit: ' \
+    + 'https://pixabay.com/api/docs/ '
+    
+  # TODO: Test API key.
+    
+  newUser.apiKey = apiKey
+  
+  user = newUser
+  
+    
 # Interpret commands.
 switch process.argv[2]
-  when 'install' then install()
-  when 'add' then add process.argv
-  when 'remove' then remove process.argv
+  when 'init' then init()
+  when 'auth' then auth()
+  else
+    if loadConfig()
+      switch process.argv[2]
+        when 'install' then install()
+        when 'add' then add process.argv
+        when 'remove' then remove process.argv
+        
