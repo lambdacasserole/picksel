@@ -22,7 +22,7 @@ logSettings =
 log = new Log logSettings
 
 
-# Map of resolution property names.
+# Array of resolution property names.
 resolutions = [
   'previewURL'
   'webformatURL'
@@ -33,6 +33,7 @@ resolutions = [
 ]
 
 
+# Array of human-readable resolution names.
 humanResolutions = [
   'tiny'
   'small'
@@ -43,12 +44,30 @@ humanResolutions = [
 ]
 
 
-isValidId = (id) -> !isNaN(id) && parseInt(id) >= 0
+# Builds a URL for downloading image information.
+#
+# @param [String] apiKey the API key to use for the request
+# @param [Number] id the ID of the image to get information for
+# @param [Number] res the resolution code of the image to get
+#
+buildUrl = (apiKey, id, res) ->
+  'https://pixabay.com/api/?key=' \
+    + user.apiKey \
+    + (if res > 1 then '&response_group=high_resolution' else '') \
+    + '&id=' \
+    + id
 
-
+    
+# Checks whether or not a resolution code is valid.
+#
+# @param [Number] res the resolution code to check.
+#
 isValidResolution = (res) -> humanResolutions.indexOf(res) > -1
 
 
+# Gets the code for a human-readable resolution name.
+#
+# @param [String] res the human-readable resolution name to get the code for
 getResolutionCode = (res) -> humanResolutions.indexOf res
 
 
@@ -62,35 +81,35 @@ persistConfig = () ->
     
 # Downloads an image.
 #
-# @param [Number] id the Pixabay image ID
+# @param [String] id the Pixabay image ID
 # @param [Number] resolution the resolution to download the image in
 # @param [String] destination the path of the destination file
 #
 download = (id, resolution, destination) ->
   # Build URL for API request.
-  url = 'https://pixabay.com/api/?key=' \
-    + user.apiKey \
-    + (if resolution > 1 then '&response_group=high_resolution' else '') \
-    + '&id=' \
-    + id
+  url = buildUrl(user.apiKey, id, resolution)
   
   log.info 'Requesting information for image with ID ' \
     + id \
     + ' from ' \
     + url
     
-  # Request JSON from Pixabay.
+  # Call out to Pixabay.
   options =
     url: url
     json: true
   request options, (error, response, body) ->
-    if !body.hits
-      log.error 'Couldn\'t get information about image ' \
-        + id
+    if error || !body || !body.hits
+      log.error 'Couldn\'t get information about image with ID \'' \
+        + id \
+        + '\''
     else
+      url = body.hits[0][resolutions[resolution]];
+      log.info 'Downloading file from ' \
+        + url
       file = fs.createWriteStream destination
-      req = https.get body.hits[0][resolutions[resolution]], (res) ->
-        res.pipe file
+      req = https.get url, (response) ->
+        response.pipe file
 
       
 # Installs a single image.
