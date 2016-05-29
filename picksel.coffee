@@ -48,6 +48,10 @@ humanResolutions = [
 ]
 
 
+# Redacts the user's API key from the given URL.
+#
+# @param [String] url the URL to redact the API key from
+#
 redactApiKey = (url) -> url.replace user.apiKey, '[NOPE]'
 
 
@@ -58,14 +62,12 @@ redactApiKey = (url) -> url.replace user.apiKey, '[NOPE]'
 # @param [Number] res the resolution code of the image to get
 #
 buildUrl = (apiKey, id, res) ->
-  'https://pixabay.com/api/?key=' \
-    + user.apiKey \
+  "https://pixabay.com/api/?key=#{user.apiKey}" \
     + (if res > 1 then '&response_group=high_resolution' else '') \
-    + '&id=' \
-    + id
+    + "&id=#{id}"
 
     
-# Checks whether or not a resolution code is valid.
+# Checks whether or not a human-readable resolution name is valid.
 #
 # @param [Number] res the resolution code to check.
 #
@@ -91,7 +93,7 @@ persistConfig = () ->
 # @param [Object] error any error returned with the response
 # @param [Object] body the body of the response
 #
-isSuccessful = (error, body) -> 
+isSuccessful = (error, body) ->
   !error \
   && body \
   && body.hits \
@@ -106,64 +108,62 @@ isSuccessful = (error, body) ->
 # @param [String] destination the path of the destination file
 #
 download = (id, resolution, destination) ->
+  
   # Build URL for API request.
   url = buildUrl(user.apiKey, id, resolution)
   
-  log.info 'Requesting information for image' \
-    + ' from ' \
-    + redactApiKey url
+  log.info "Requesting information for image from '#{redactApiKey(url)}'"
     
+  # Call out to Pixabay for JSON.
   options =
     url: url
     json: true
-    
-  # Call out to Pixabay.
   request options, (error, response, body) ->
     
     # On success.
     if isSuccessful error, body
       url = body.hits[0][resolutions[resolution]]
-      log.info 'Downloading file from \'' \
-        + url \
-        + '\'...'
+      
+      log.info "Downloading image file from '#{url}'"
+      
+      # Request image from Pixabay.
       tempDestination = destination + '.pickseltemp'
       file = fs.createWriteStream tempDestination
       req = https.get url, (response) ->
+        
+        # Write to temporary file.
         stream = response.pipe file
         stream.on 'finish', () ->
-          if existsFile.sync(destination) && md5File.sync(tempDestination) != md5File.sync(destination)
-            log.warning 'Looks like \'' \
-              + destination \
-              + '\' has been modified (MD5 hashes ' \
-              + md5File.sync(tempDestination) \
-              + ', ' \
-              + md5File.sync(destination) \
-              + ') so not gonna overwrite it.'
-            filedel tempDestination
+          
+          # Does file currently exist at destination?
+          exists = existsFile.sync(destination)
+          
+          # Hash temp file (and existing file if possible).
+          existingHash = if exists then md5File.sync(destination) else ''
+          tempHash = md5File.sync(tempDestination)
+          
+          # If file currently exists and hashes don't match, don't overwrite.
+          if exists && existingHash != tempHash
+            log.warning "Looks like '#{destination}' has been modified (MD5" \
+              + " hashes #{tempHash} != #{existingHash}) so not gonna" \
+              + ' overwrite it'
+            filedel tempDestination # Remove temporary file.
           else
+            # Move file to final destination.
             fileMove tempDestination, destination, (err) ->
-              log.info 'Finished installing image with ID \'' \
-                + id \
-                + '\''
+              log.info "Finished installing image with ID '#{id}'"
     else
       # Download failed.
-      log.error 'Couldn\'t get information about image with ID \'' \
-        + id \
-        + '\''
+      log.error "Couldn't get information about image with ID '#{id}'"
         
       
 # Installs a single image.
 #
 # @param [Object] image the image to grab
 grab = (image) ->
-  path = './' + config.directory + '/' + image.destination
-  log.info 'Installing image with ID ' \
-    + image.id \
-    + ' at resolution \'' \
-    + humanResolutions[image.resolution] \
-    + '\' to \'' \
-    + path \
-    + '\'.'
+  path = "./#{config.directory}/#{image.destination}"
+  log.info "Installing image with ID #{image.id} at resolution" \
+    + "#{humanResolutions[image.resolution]} to #{path}"
   download image.id, image.resolution, path
 
   
@@ -179,14 +179,14 @@ install = () -> grab image for image in config.images
 add = (args) ->
   # Check ID.
   id = args[3]
-  if !isValidId id
-    log.error 'That ID \'' + id + '\' isn\'t valid.'
-    return false
+#  if !isValidId id
+#    log.error "That ID '#{id}' isn't valid."
+#    return false
    
   # Check resolution.
   res = args[4]
   if !isValidResolution res
-    log.error 'That resolution \'' + res + '\' isn\'t valid.'
+    log.error "That resolution '#{res}' isn't valid."
     return false
   
   # Add new image to configuration file.
@@ -198,9 +198,7 @@ add = (args) ->
   
   persistConfig() # Update configuration file.
   
-  log.info 'Added image with ID \'' \
-    + image.id \
-    + '\' as asset.'
+  log.info "Added image with ID '#{image.id}' as asset."
   
   install() # Freshly install all images.
      
@@ -214,9 +212,8 @@ remove = (args) ->
   images = config.images
   filteredImages = images.filter (obj) -> obj.id != args[3]
   if images.length == filteredImages.length
-    log.warning 'Couldn\'t uninstall image with ID ' \
-      + id \
-      + ' becuse it\'s not installed in the first place.'
+    log.warning "Couldn't uninstall image with ID '#{id}' because it's not" \
+      + ' installed in the first place.'
   else
     config.images = filteredImages
     persistConfig()
