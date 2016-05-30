@@ -246,7 +246,7 @@ loadConfig = () ->
   if existsFile.sync configPath
     config = jsonfile.readFileSync configPath
   else
-    log.error "Couldn't find your #{configPath} file with all your" \
+    log.error "Couldn't find your '#{configPath}' file with all your" \
       + ' dependencies. You should probably run \'picksel init\' to set one' \
       + ' up.'
     return false
@@ -293,7 +293,7 @@ auth = () ->
   newUser =
     apiKey: ''
     
-  console.log 'Picksel needs your API key in order to work...'
+  console.log 'Let\'s associate a Pixabay account with this project...'
   
   apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
     + ' can log in to the Pixabay website and visit: ' \
@@ -307,9 +307,29 @@ auth = () ->
   log.info "New file created at '#{userPath}' containing your API key. DON'T" \
     + " CHECK THIS FILE IN TO SOURCE CONTROL."
   
+  
+# Prints usage information for the application.
+#
+help = () ->
+  console.log 'Picksel Asset Manager\n' \
+    + 'Usage: picksel <command> <args> \n' \
+    + 'Commands:\n' \
+    + '  help                  Shows usage information for the application\n' \
+    + '  init                  Set up this directory for Picksel\n' \
+    + '  auth                  Set up authentication with Pixabay\n' \
+    + '  install               Installs all assets\n' \
+    + '  add <id> <res> <dest> Adds a dependency on an asset\n' \
+    + '    id   The (hash) ID of the image to install on Pixabay\n' \
+    + '    res  The resolution to install the image at\n' \
+    + '         (tiny|small|large|hd|full|vector)\n' \
+    + '    dest The file path to install the image to\n' \
+    + '  remove <id>           Removes a dependency on an asset\n' \
+    + '    id   The (hash) ID of the image to remove from dependencies'
+  
     
 # Interpret commands.
 switch process.argv[2]
+  when 'help' then help()
   when 'init' then init()
   when 'auth' then auth()
   else
