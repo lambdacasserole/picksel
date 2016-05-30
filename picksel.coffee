@@ -139,6 +139,7 @@ download = (id, resolution, destination) ->
     
     # On success.
     if isSuccessful error, body
+      
       # Get URL of image at correct resolution.
       url = body.hits[0][resolutions[resolution]]
       
@@ -281,9 +282,10 @@ init = () ->
     
  
 # Walks the user through initializing their user file.
+#
 auth = () ->
   
-  # Check we're not going to overwrite an existing project file.
+  # Check we're not going to overwrite an existing user file.
   if existsFile.sync userPath
     log.warning 'Looks like authentication is already set up for this project.'
     return false
