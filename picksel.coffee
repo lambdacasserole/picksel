@@ -97,12 +97,12 @@ persist = (obj, filename) ->
   
 # Persists the currently loaded configuration settings
 #
-persistConfig = () -> persist configPath, config
+persistConfig = () -> persist config, configPath
 
 
 # Persists the currently loaded user settings.
 #
-persistUser = () -> persist userPath, user
+persistUser = () -> persist user, userPath
 
     
 # Returns true if a request to the Pixabay API was successful.
