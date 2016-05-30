@@ -55,7 +55,7 @@ humanResolutions = [
 #
 # @param [String] url the URL to redact the API key from
 #
-redactApiKey = (url) -> url.replace user.apiKey, '[NOPE]'
+redactApiKey = (url) -> url.replace user.apiKey, '********'
 
 
 # Builds a URL for downloading image information.
