@@ -296,7 +296,8 @@ auth = () ->
   newUser =
     apiKey: ''
     
-  console.log 'Let\'s associate a Pixabay account with this project...'
+  console.log 'Let\'s associate a Pixabay account with your local copy of' \
+    + ' this project...'
   
   apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
     + ' can log in to the Pixabay website and visit: ' \
@@ -308,7 +309,8 @@ auth = () ->
   persistUser()
   
   log.info "New file created at '#{USER_PATH}' containing your API key." \
-    + " DON'T CHECK THIS FILE IN TO SOURCE CONTROL."
+    + " DON'T CHECK THIS FILE IN TO SOURCE CONTROL BECAUSE IT HAS YOUR" \
+    + " SECRET API KEY IN IT."
   
   
 # Prints usage information for the application.
