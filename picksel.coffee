@@ -1,3 +1,8 @@
+# Constants.
+USER_PATH = './.pickselacc'
+CONFIG_PATH = './picksel.json'
+
+
 # Load core dependencies.
 https = require 'https'
 fs = require 'fs'
@@ -14,9 +19,7 @@ readline = require 'readline-sync'
 
 
 # Space for config files.
-userPath = './.pickselacc'
 user = null
-configPath = './picksel.json'
 config = null
 
 
@@ -97,12 +100,12 @@ persist = (obj, filename) ->
   
 # Persists the currently loaded configuration settings
 #
-persistConfig = () -> persist config, configPath
+persistConfig = () -> persist config, CONFIG_PATH
 
 
 # Persists the currently loaded user settings.
 #
-persistUser = () -> persist user, userPath
+persistUser = () -> persist user, USER_PATH
 
     
 # Returns true if a request to the Pixabay API was successful.
@@ -237,16 +240,16 @@ remove = (args) ->
 # Attempts to load the user and dependency configuration files.
 #
 loadConfig = () ->
-  if existsFile.sync userPath
-    user = jsonfile.readFileSync userPath
+  if existsFile.sync USER_PATH
+    user = jsonfile.readFileSync USER_PATH
   else
-    log.error "Couldn't find your '#{userPath}' file to get your API key." \
+    log.error "Couldn't find your '#{USER_PATH}' file to get your API key." \
       + ' You should probably run \'picksel auth\' to set one up.'
     return false
-  if existsFile.sync configPath
-    config = jsonfile.readFileSync configPath
+  if existsFile.sync CONFIG_PATH
+    config = jsonfile.readFileSync CONFIG_PATH
   else
-    log.error "Couldn't find your '#{configPath}' file with all your" \
+    log.error "Couldn't find your '#{CONFIG_PATH}' file with all your" \
       + ' dependencies. You should probably run \'picksel init\' to set one' \
       + ' up.'
     return false
@@ -258,7 +261,7 @@ loadConfig = () ->
 init = () ->
   
   # Check we're not going to overwrite an existing project file.
-  if existsFile.sync configPath
+  if existsFile.sync CONFIG_PATH
     log.warning 'Looks like this project has already been initialized for' \
       + ' Picksel.'
       return false
@@ -277,7 +280,7 @@ init = () ->
   config = newConfig
   persistConfig()
   
-  log.info "New file created at '#{configPath}' for holding your" \
+  log.info "New file created at '#{CONFIG_PATH}' for holding your" \
     + ' asset dependencies. Feel free to check this file in to source control.'
     
  
@@ -286,7 +289,7 @@ init = () ->
 auth = () ->
   
   # Check we're not going to overwrite an existing user file.
-  if existsFile.sync userPath
+  if existsFile.sync USER_PATH
     log.warning 'Looks like authentication is already set up for this project.'
     return false
     
@@ -304,8 +307,8 @@ auth = () ->
   user = newUser
   persistUser()
   
-  log.info "New file created at '#{userPath}' containing your API key. DON'T" \
-    + " CHECK THIS FILE IN TO SOURCE CONTROL."
+  log.info "New file created at '#{USER_PATH}' containing your API key." \
+    + " DON'T CHECK THIS FILE IN TO SOURCE CONTROL."
   
   
 # Prints usage information for the application.
