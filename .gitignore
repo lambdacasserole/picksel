@@ -34,3 +34,7 @@ node_modules
 
 # Sensitive information
 .pickselacc
+
+# Picksel package manager stuff
+picksel_assets
+picksel.json
