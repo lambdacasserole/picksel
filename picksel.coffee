@@ -100,7 +100,7 @@ ask = (question, callback) ->
 # @param [Number] res the resolution code of the image to get
 #
 buildUrl = (apiKey, id, res) ->
-  "https://pixabay.com/api/?key=#{user.apiKey}" \
+  "https://pixabay.com/api/?key=#{apiKey}" \
     + (if res > 1 then '&response_group=high_resolution' else '') \
     + "&id=#{id}"
 
@@ -143,19 +143,6 @@ persistProject = (obj, callback) ->
 persistUser = (obj, callback) ->
   if obj then user = obj # Replace loaded user.
   persist USER_PATH, user, callback
-
-
-# Returns true if a request to the Pixabay API was successful.
-#
-# @param [Object] error any error returned with the response
-# @param [Object] body the body of the response
-#
-isSuccessful = (error, body) ->
-  !error \
-  && body \
-  && body.hits \
-  && body.hits instanceof Array \
-  && body.hits.length > 0
 
 
 # Downloads an image.
@@ -304,7 +291,7 @@ promptDirectoryCreation = (dir, callback) ->
     if err || exists
       callback err, exists # Folder exists already, or error.
     else
-      ask "Doesn't look like the #{dir} directory exists, create it? (y/n)", \
+      ask "Doesn't look like the #{dir} directory exists, create it? (y/n) ", \
         (answer) ->
           if yn answer # Create directory? Yes or no.
             mkdirp dir, (err) ->
@@ -345,6 +332,20 @@ init = () ->
                   + ' in to source control.' # Project setup success!
 
 
+# Validates that an API key works with Pixabay.
+#
+# @param [String] key the API key to validate
+# @param [Function] callback the function to call back on
+#
+validateApiKey = (key, callback) ->
+  url = buildUrl key, '195893', 0 # We know this image exists.
+  options =
+    url: url
+    json: true
+  request url, (error, response, body) -> # Request image JSON using API key.
+    callback(!error && response.statusCode == 200)
+
+
 # Walks the user through initializing their user file.
 #
 auth = () ->
@@ -359,15 +360,18 @@ auth = () ->
       ask 'What\'s your Pixabay API key? To find it you can log in to the' \
         + ' Pixabay website and visit: https://pixabay.com/api/docs/ ', \
         (answer) ->
-          # TODO: Validate API key?
-          newUser.apiKey = apiKey # Add API key to user.
-          persistUser newUser, (err) -> # Persist new user file.
-            if err
-              log.error 'Error writing your user file to disk!'
+          validateApiKey answer, (success) -> # Check API key works.
+            if success
+              newUser.apiKey = answer # Add API key to user.
+              persistUser newUser, (err) -> # Persist new user file.
+                if err
+                  log.error 'Error writing your user file to disk!'
+                else
+                  log.info "New file created at '#{USER_PATH}' containing" \
+                    + ' your API key. DON\'T CHECK THIS FILE IN TO SOURCE' \
+                    + ' CONTROL BECAUSE IT HAS YOUR SECRET API KEY IN IT.'
             else
-              log.info "New file created at '#{USER_PATH}' containing your" \
-                + ' API key. DON\'T CHECK THIS FILE IN TO SOURCE CONTROL' \
-                + ' BECAUSE IT HAS YOUR SECRET API KEY IN IT.'
+              log.error "That API key didn't work with Pixabay!"
 
 
 # Prints usage information for the application.
