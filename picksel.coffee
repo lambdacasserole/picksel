@@ -1,14 +1,11 @@
 # Constants.
-USER_PATH = './.pickselacc'
-PROJECT_PATH = './picksel.json'
+USER_PATH = './.pickselacc' # Location of user file.
+PROJECT_PATH = './picksel.json' # Location of project file.
 
 
-# Load core dependencies.
+# Load dependencies.
 https = require 'https'
 fs = require 'fs'
-
-
-# Load third party dependencies.
 request = require 'request'
 jsonfile = require 'jsonfile'
 existsFile = require 'exists-file'
@@ -33,13 +30,16 @@ logSettings =
   date: false
 log = new Log logSettings
 
-
+# Represents a Picksel project.
+#
 class Project
   constructor: () ->
     @directory = ''
     @images = []
 
 
+# Represents a Picksel user.
+#
 class User
   constructor: () ->
     @apiKey = ''
@@ -467,15 +467,16 @@ help = () ->
 
 # Interpret commands.
 switch process.argv[2]
-  when 'help' then help()
-  when 'init' then init()
-  when 'auth' then auth()
+  when 'help' then help() # Show program usage information.
+  when 'init' then init() # Initialize project.
+  when 'auth' then auth() # Authenticate user.
   else
-    loadWorkspace (success) ->
+    loadWorkspace (success) -> # For these commands, we need a workspace.
       if success
         switch process.argv[2]
-          when 'install' then install()
-          when 'add' then add process.argv
-          when 'remove' then remove process.argv
+          when 'install' then install() # Install assets.
+          when 'add' then add process.argv # Add asset.
+          when 'remove' then remove process.argv # Remove asset.
       else
+        # Workspace needs setting up first.
         log.error "Couldn't load workspace for above reason. Terminating."
