@@ -15,23 +15,10 @@ existsFile = require 'exists-file'
 md5File = require 'md5-file'
 filedel = require 'filedel'
 fileMove = require 'file-move'
-i18n = require 'i18n'
-#pixabay = require 'pixabayjs'
 yn = require 'yn'
 mkdir = require 'mkdir-p'
-
 readline = require 'readline'
 
-
-locales = [
-  'en'
-  'eo'
-]
-i18nconfig =
-  locales: locales
-  directory: './locales'
-i18n.configure i18nconfig
-i18n.setLocale 'eo'
 
 # Space for workspace files.
 user = null
@@ -51,6 +38,7 @@ class Project
   constructor: () ->
     @directory = ''
     @images = []
+
 
 class User
   constructor: () ->
