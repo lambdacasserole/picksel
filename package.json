@@ -14,19 +14,18 @@
   "author": "Saul Johnson <saul.a.johnson@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "coffee": "^3.2.1",
-    "commander": "^2.9.0",
     "exists-file": "^2.0.0",
     "file-move": "0.0.3",
     "filedel": "^2.0.1",
-    "i18n": "^0.8.2",
     "jsonfile": "^2.3.1",
     "log-color-optionaldate": "^1.1.0",
     "md5-file": "^3.1.0",
-    "readline-sync": "^1.4.2",
-    "request": "^2.72.0"
+    "mkdir-p": "0.0.7",
+    "request": "^2.72.0",
+    "yn": "^1.2.0"
   },
   "devDependencies": {
+    "coffee": "^3.2.1",
     "codo": "^2.1.0",
     "coffeelint": "^1.15.7"
   }
