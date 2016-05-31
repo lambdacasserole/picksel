@@ -16,7 +16,17 @@ md5File = require 'md5-file'
 filedel = require 'filedel'
 fileMove = require 'file-move'
 readline = require 'readline-sync'
+i18n = require("i18n");
 
+locales = [
+  'en'
+  'eo'
+]
+i18nconfig = 
+  locales: locales
+  directory: './locales'
+i18n.configure i18nconfig
+i18n.setLocale 'eo'
 
 # Space for config files.
 user = null
@@ -132,7 +142,8 @@ download = (id, resolution, destination) ->
   # Build URL for API request.
   url = buildUrl(user.apiKey, id, resolution)
   
-  log.info "Requesting information for image from '#{redactApiKey(url)}'"
+  log.info i18n.__('Requesting information for image from %s', \
+                   redactApiKey(url))
     
   # Call out to Pixabay for JSON.
   options =
@@ -146,7 +157,7 @@ download = (id, resolution, destination) ->
       # Get URL of image at correct resolution.
       url = body.hits[0][resolutions[resolution]]
       
-      log.info "Downloading image file from '#{url}'"
+      log.info i18n.__('Downloading image file from %s', url)
       
       # Request image from Pixabay.
       tempDestination = destination + '.pickseltemp'
