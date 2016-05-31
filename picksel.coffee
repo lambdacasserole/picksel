@@ -145,6 +145,33 @@ persistUser = (obj, callback) ->
   persist USER_PATH, user, callback
 
 
+# Compares two files using their MD5 checksums.
+#
+# @param [String] x the filepath of the first file
+# @param [String] y the filepath of the second file
+# @param [Function] callback the function to call back on
+compareFiles = (x, y, callback) ->
+  md5File x, (err, xHash) ->
+    if err
+      callback err, null # Comparison error.
+    else
+      md5File y, (err, yHash) ->
+        if err
+          callback err, null # Comparison error.
+        else
+          if xHash != yHash
+            callback null, false # Success, files different.
+          else
+            callback null, true # Success, files identical.
+
+
+requestJson = (url, callback) ->
+  options =
+    url: url
+    json: true
+  request options, callback
+
+
 # Downloads an image.
 #
 # @param [String] id the Pixabay image ID
@@ -152,65 +179,72 @@ persistUser = (obj, callback) ->
 # @param [String] destination the path of the destination file
 #
 download = (id, resolution, destination) ->
-
-  # Build URL for API request.
-  url = buildUrl(user.apiKey, id, resolution)
-
-  log.info i18n.__('Requesting information for image from %s', \
-                   redactApiKey(url))
-
-  # Call out to Pixabay for JSON.
-  options =
-    url: url
-    json: true
-  request options, (error, response, body) ->
-
-    # On success.
-    if isSuccessful error, body
-
+  url = buildUrl user.apiKey, id, resolution # Build URL for API request.
+  log.info "Requesting information for image from #{redactApiKey(url)}"
+  requestJson url, (error, response, body) -> # Call out to Pixabay for JSON.
+    if !error && response.statusCode == 200
       # Get URL of image at correct resolution.
-      url = body.hits[0][resolutions[resolution]]
-
-      log.info i18n.__('Downloading image file from %s', url)
-
-      # Request image from Pixabay.
-      tempDestination = destination + '.pickseltemp'
-      file = fs.createWriteStream tempDestination
-      req = https.get url, (response) ->
-
-        # Write to temporary file.
-        stream = response.pipe file
-        stream.on 'finish', () ->
-
-          # Does file currently exist at destination?
-          exists = existsFile.sync(destination)
-
-          # Hash temp file (and existing file if possible).
-          existingHash = if exists then md5File.sync(destination) else ''
-          tempHash = md5File.sync(tempDestination)
-
-          # If file currently exists and hashes don't match, don't overwrite.
-          if exists && existingHash != tempHash
-            log.warning "Looks like '#{destination}' has been modified (MD5" \
-              + " hashes #{tempHash} != #{existingHash}) so not gonna" \
-              + ' overwrite it'
-            filedel tempDestination # Remove temporary file.
-          else
-            # Move file to final destination.
-            fileMove tempDestination, destination, (err) ->
-              log.info "Finished installing image with ID '#{id}'"
+      url = body.hits[0][humanResolutionToApiResolution(resolution)]
+      log.info "Downloading image file from #{url}"
+      temp = destination + '.pickseltemp' # Temporary file name.
+      file = fs.createWriteStream temp # Open write stream.
+      req = https.get url, (response) -> # Request actual image.
+        stream = response.pipe file # Write to temporary file.
+        stream.on 'finish', () -> # On write finished.
+          existsFile destination, (err, exists) -> # Does file currently exist?
+            if err
+              log.error 'Couldn\'t access disk for file hash comparison.' \
+                + ' Aborting.'
+            else
+              if exists # If a file already exists at destination.
+                compareFiles destination, temp, (err, identical) ->
+                  if err
+                    log.error 'Couldn\'t compare files. Aborting.'
+                  else
+                    if identical
+                      log.info "Asset with ID '#{id}' already on disk."
+                    else
+                      log.warning "Looks like '#{destination}' has been" \
+                        + " modified (MD5 hashes #{tempHash} !=" \
+                        + " #{existingHash}) so not gonna overwrite it!"
+                    filedel temp # The temporary file should be deleted anyway.
+              else
+                # Move file to final destination.
+                fileMove temp, destination, (err) ->
+                  log.info "Finished installing image with ID '#{id}'"
     else
       # Download failed.
       log.error "Couldn't get information about image with ID '#{id}'"
+
+
+# Translates a resolution code to an API resolution.
+#
+# @param [Number] code th code to translate
+codeToApiResolution = (code) -> resolutions[code]
+
+
+# Translates a human-readable resolution to a resolution code.
+#
+# @param [String] resolution the resolution to translate
+#
+humanResolutionToCode = (resolution) -> humanResolutions.indexOf resolution
+
+
+# Translates a human-readable resolution into an API resolution.
+#
+# @param [String] resolution the resolution to translate
+#
+humanResolutionToApiResolution = (resolution) ->
+  codeToApiResolution humanResolutionToCode(resolution)
 
 
 # Installs a single image.
 #
 # @param [Object] image the image to grab
 grab = (image) ->
-  path = "./#{project.directory}/#{image.destination}"
-  log.info "Installing image with ID #{image.id} at resolution" \
-    + "#{humanResolutions[image.resolution]} to #{path}"
+  path = "./#{project.directory}/#{image.destination}" # Calculate path.
+  log.info "Installing image with ID '#{image.id}' at resolution" \
+    + " '#{image.resolution}' to '#{path}'"
   download image.id, image.resolution, path
 
 
@@ -232,10 +266,7 @@ isNumeric = (str) -> /^\d+$/.test str
 #
 validateId = (id, callback) ->
   url = buildUrl user.apiKey, id, (if isNumeric then 0 else 2) # Hash ID?
-  options =
-    url: url
-    json: true
-  request url, (error, response, body) -> # Request image JSON.
+  requestJson url, (error, response, body) -> # Request image JSON.
     callback(!error && response.statusCode == 200)
 
 
@@ -384,10 +415,7 @@ init = () ->
 #
 validateApiKey = (key, callback) ->
   url = buildUrl key, '195893', 0 # We know this image exists.
-  options =
-    url: url
-    json: true
-  request url, (error, response, body) -> # Request image JSON using API key.
+  requestJson url, (error, response, body) -> # Request image JSON.
     callback(!error && response.statusCode == 200)
 
 
