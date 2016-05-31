@@ -74,6 +74,10 @@ class ProjectConfiguration
     @directory = ''
     @images = []
 
+class User
+  constructor: () ->
+    @apiKey = ''
+
 # Redacts the user's API key from the given URL.
 #
 # @param [String] url the URL to redact the API key from
@@ -117,25 +121,28 @@ getResolutionCode = (res) -> humanResolutions.indexOf res
 
 # Persists an object to a file as JSON.
 #
-# @param [Object] obj the object to persist
 # @param [String] filename the name of the file to persist to
+# @param [Object] obj the object to persist
+# @param [Function] callback the function to call back on
 #
-persist = (obj, filename) ->
+persist = (filename, obj, callback) ->
   options =
     spaces: 4
-  jsonfile.writeFileSync filename, obj, options
+  jsonfile.writeFile filename, obj, options, callback
 
 
 # Persists the currently loaded configuration settings
 #
-persistProject = (obj) ->
+persistProject = (obj, callback) ->
   if obj then config = obj # Replace loaded config.
-  persist config, CONFIG_PATH
+  persist CONFIG_PATH, config, callback
 
 
 # Persists the currently loaded user settings.
 #
-persistUser = () -> persist user, USER_PATH
+persistUser = (obj, callback) ->
+  if obj then user = obj # Replace loaded user.
+  persist USER_PATH, user, callback
 
 
 # Returns true if a request to the Pixabay API was successful.
@@ -297,7 +304,7 @@ promptDirectoryCreation = (dir, callback) ->
     if err || exists
       callback err, exists # Folder exists already, or error.
     else
-      ask "Doesn't look like the #{dir} directory exists, create it?", \
+      ask "Doesn't look like the #{dir} directory exists, create it? (y/n)", \
         (answer) ->
           if yn answer # Create directory? Yes or no.
             mkdirp dir, (err) ->
@@ -327,42 +334,40 @@ init = () ->
           promptDirectoryCreation answer, (err, exists) ->
             if !exists # Warn user about missing assets directory.
               log.warning "The #{answer} directory isn't present on-disk. You" \
-                + " won't be able to install assets until it is."
+                + ' won\'t be able to install assets until it is.'
             newProj.directory = answer # Add asset path to project.
-            persistProject newProj # Persist new project file.
-            log.info "New file created at '#{CONFIG_PATH}' for holding your" \
-              + ' asset dependencies. Feel free to check this file in to' \
-              + ' source control.' # Project setup success!
+            persistProject newProj, (err) -> # Persist new project file.
+              if err
+                log.error 'Error writing your project file to disk!'
+              else
+                log.info "New file created at '#{CONFIG_PATH}' for holding" \
+                  + ' your asset dependencies. Feel free to check this file' \
+                  + ' in to source control.' # Project setup success!
 
 
 # Walks the user through initializing their user file.
 #
 auth = () ->
-
-  # Check we're not going to overwrite an existing user file.
-  if existsFile.sync USER_PATH
-    log.warning 'Looks like authentication is already set up for this project.'
-    return false
-
-  newUser =
-    apiKey: ''
-
-  console.log 'Let\'s associate a Pixabay account with your local copy of' \
-    + ' this project...'
-
-  apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
-    + ' can log in to the Pixabay website and visit: ' \
-    + 'https://pixabay.com/api/docs/ '
-  # TODO: Validate API key?
-  newUser.apiKey = apiKey
-
-  # Persist user file.
-  user = newUser
-  persistUser()
-
-  log.info "New file created at '#{USER_PATH}' containing your API key." \
-    + " DON'T CHECK THIS FILE IN TO SOURCE CONTROL BECAUSE IT HAS YOUR" \
-    + " SECRET API KEY IN IT."
+  existsFile USER_PATH, (err, stats) -> # Check for an existing user file.
+    if stats
+      log.warning 'Looks like authentication is already set up for this' \
+        + ' project.'
+    else
+      log.info 'Let\'s associate a Pixabay account with your local copy of' \
+        + ' this project...'
+      newUser = new User() # Initialize new user.
+      ask 'What\'s your Pixabay API key? To find it you can log in to the' \
+        + ' Pixabay website and visit: https://pixabay.com/api/docs/ ', \
+        (answer) ->
+          # TODO: Validate API key?
+          newUser.apiKey = apiKey # Add API key to user.
+          persistUser newUser, (err) -> # Persist new user file.
+            if err
+              log.error 'Error writing your user file to disk!'
+            else
+              log.info "New file created at '#{USER_PATH}' containing your" \
+                + ' API key. DON\'T CHECK THIS FILE IN TO SOURCE CONTROL' \
+                + ' BECAUSE IT HAS YOUR SECRET API KEY IN IT.'
 
 
 # Prints usage information for the application.
