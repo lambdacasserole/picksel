@@ -47,28 +47,6 @@ logSettings =
 log = new Log logSettings
 
 
-# Array of resolution property names.
-resolutions = [
-  'previewURL'
-  'webformatURL'
-  'largeImageURL'
-  'fullHDURL'
-  'imageURL'
-  'vectorURL'
-]
-
-
-# Array of human-readable resolution names.
-humanResolutions = [
-  'tiny'
-  'small'
-  'large'
-  'hd'
-  'full'
-  'vector'
-]
-
-
 class Project
   constructor: () ->
     @directory = ''
@@ -78,20 +56,28 @@ class User
   constructor: () ->
     @apiKey = ''
 
+
 # Redacts the user's API key from the given URL.
 #
 # @param [String] url the URL to redact the API key from
 #
 redactApiKey = (url) -> url.replace user.apiKey, '********'
 
+
+# Asks the user a question via the command line.
+#
+# @param [String] question the question to ask
+# @param [Function] callback the function to call back on
+#
 ask = (question, callback) ->
   readlineOptions =
     input: process.stdin
     output: process.stdout
-  rl = readline.createInterface readlineOptions
-  rl.question question, (answer) ->
-    rl.close()
+  reader = readline.createInterface readlineOptions
+  reader.question question, (answer) ->
+    reader.close() # Close before passing answer to callback.
     callback answer
+
 
 # Builds a URL for downloading image information.
 #
@@ -105,18 +91,43 @@ buildUrl = (apiKey, id, res) ->
     + "&id=#{id}"
 
 
+# Translates a resolution code to an API resolution.
+#
+# @param [Number] code th code to translate
+#
+codeToApiResolution = (code) ->
+  resolutions = [
+    'previewURL'
+    'webformatURL'
+    'largeImageURL'
+    'fullHDURL'
+    'imageURL'
+    'vectorURL'
+  ]
+  resolutions[code]
+
+
+# Translates a human-readable resolution to a resolution code.
+#
+# @param [String] resolution the resolution to translate
+#
+humanResolutionToCode = (resolution) ->
+  humanResolutions = [
+    'tiny'
+    'small'
+    'large'
+    'hd'
+    'full'
+    'vector'
+  ]
+  humanResolutions.indexOf resolution
+
+
 # Checks whether or not a human-readable resolution name is valid.
 #
-# @param [Number] res the resolution code to check.
+# @param [Number] resolution the resolution code to check.
 #
-isValidResolution = (res) -> humanResolutions.indexOf(res) > -1
-
-
-# Gets the code for a human-readable resolution name.
-#
-# @param [String] res the human-readable resolution name to get the code for
-#
-getResolutionCode = (res) -> humanResolutions.indexOf res
+isValidResolutionCode = (resolution) -> humanResolutionToCode(resolution) > -1
 
 
 # Persists an object to a file as JSON.
@@ -131,14 +142,20 @@ persist = (filename, obj, callback) ->
   jsonfile.writeFile filename, obj, options, callback
 
 
-# Persists a project.
+# Persists a project and loads it.
+#
+# @param [Object] obj the object to persist or null to persist loaded project
+# @param [Function] callback the function to call back on
 #
 persistProject = (obj, callback) ->
   if obj then project = obj # Replace loaded project.
   persist PROJECT_PATH, project, callback
 
 
-# Persists a user.
+# Persists a user and loads it.
+#
+# @param [Object] obj the object to persist or null to persist loaded user
+# @param [Function] callback the function to call back on
 #
 persistUser = (obj, callback) ->
   if obj then user = obj # Replace loaded user.
@@ -150,6 +167,7 @@ persistUser = (obj, callback) ->
 # @param [String] x the filepath of the first file
 # @param [String] y the filepath of the second file
 # @param [Function] callback the function to call back on
+#
 compareFiles = (x, y, callback) ->
   md5File x, (err, xHash) ->
     if err
@@ -165,6 +183,11 @@ compareFiles = (x, y, callback) ->
             callback null, true # Success, files identical.
 
 
+# Requests a JSON file over HTTP.
+#
+# @param [String] url the URL to fetch the JSON from.
+# @param [Function] callback the function to call back on
+#
 requestJson = (url, callback) ->
   options =
     url: url
@@ -217,19 +240,6 @@ download = (id, resolution, destination) ->
       log.error "Couldn't get information about image with ID '#{id}'"
 
 
-# Translates a resolution code to an API resolution.
-#
-# @param [Number] code th code to translate
-codeToApiResolution = (code) -> resolutions[code]
-
-
-# Translates a human-readable resolution to a resolution code.
-#
-# @param [String] resolution the resolution to translate
-#
-humanResolutionToCode = (resolution) -> humanResolutions.indexOf resolution
-
-
 # Translates a human-readable resolution into an API resolution.
 #
 # @param [String] resolution the resolution to translate
@@ -241,6 +251,7 @@ humanResolutionToApiResolution = (resolution) ->
 # Installs a single image.
 #
 # @param [Object] image the image to grab
+#
 grab = (image) ->
   path = "./#{project.directory}/#{image.destination}" # Calculate path.
   log.info "Installing image with ID '#{image.id}' at resolution" \
@@ -284,7 +295,7 @@ add = (args) ->
       log.error 'You didn\'t provide enough arguments! Like this:' \
         + ' \'picksel add <id> <resolution> <destination>\'' # ID not passed in.
   else
-    if isValidResolution resolution
+    if isValidResolutionCode resolution
       validateId id, (success) ->
         if success
           image =
