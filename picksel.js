@@ -78,8 +78,10 @@
     });
   };
 
-  buildUrl = function(apiKey, id, res) {
-    return ("https://pixabay.com/api/?key=" + apiKey) + (res > 1 ? '&response_group=high_resolution' : '') + ("&id=" + id);
+  buildUrl = function(apiKey, id, resolution) {
+    var code;
+    code = humanResolutionToCode(resolution);
+    return ("https://pixabay.com/api/?key=" + apiKey) + (code > 1 ? '&response_group=high_resolution' : '') + ("&id=" + id);
   };
 
   codeToApiResolution = function(code) {
@@ -224,7 +226,7 @@
 
   validateId = function(id, callback) {
     var url;
-    url = buildUrl(user.apiKey, id, (isNumeric ? 0 : 2));
+    url = buildUrl(user.apiKey, id, (isNumeric(id) ? 0 : 2));
     return requestJson(url, function(error, response, body) {
       return callback(!error && response.statusCode === 200);
     });
