@@ -1,6 +1,6 @@
 # Constants.
 USER_PATH = './.pickselacc'
-CONFIG_PATH = './picksel.json'
+PROJECT_PATH = './picksel.json'
 
 
 # Load core dependencies.
@@ -18,7 +18,7 @@ fileMove = require 'file-move'
 i18n = require 'i18n'
 #pixabay = require 'pixabayjs'
 yn = require 'yn'
-mkdirp = require 'mkdir-p'
+mkdir = require 'mkdir-p'
 
 readline = require 'readline'
 
@@ -33,9 +33,9 @@ i18nconfig =
 i18n.configure i18nconfig
 i18n.setLocale 'eo'
 
-# Space for config files.
+# Space for workspace files.
 user = null
-config = null
+project = null
 
 
 # Initialize logging
@@ -69,7 +69,7 @@ humanResolutions = [
 ]
 
 
-class ProjectConfiguration
+class Project
   constructor: () ->
     @directory = ''
     @images = []
@@ -131,14 +131,14 @@ persist = (filename, obj, callback) ->
   jsonfile.writeFile filename, obj, options, callback
 
 
-# Persists the currently loaded configuration settings
+# Persists a project.
 #
 persistProject = (obj, callback) ->
-  if obj then config = obj # Replace loaded config.
-  persist CONFIG_PATH, config, callback
+  if obj then project = obj # Replace loaded project.
+  persist PROJECT_PATH, project, callback
 
 
-# Persists the currently loaded user settings.
+# Persists a user.
 #
 persistUser = (obj, callback) ->
   if obj then user = obj # Replace loaded user.
@@ -208,15 +208,35 @@ download = (id, resolution, destination) ->
 #
 # @param [Object] image the image to grab
 grab = (image) ->
-  path = "./#{config.directory}/#{image.destination}"
+  path = "./#{project.directory}/#{image.destination}"
   log.info "Installing image with ID #{image.id} at resolution" \
     + "#{humanResolutions[image.resolution]} to #{path}"
   download image.id, image.resolution, path
 
 
-# Installs all images present in the currently loaded configuration.
+# Installs all images present in the currently loaded project.
 #
-install = () -> grab image for image in config.images
+install = () -> grab image for image in project.images
+
+
+# Checks whether or not a string contains only numeric characters.
+#
+# @param [String] str the string to test
+#
+isNumeric = (str) -> /^\d+$/.test str
+
+
+# Validates that an ID maps to an image on Pixabay.
+#
+# @param [String] id the ID to check
+#
+validateId = (id, callback) ->
+  url = buildUrl user.apiKey, id, (if isNumeric then 0 else 2) # Hash ID?
+  options =
+    url: url
+    json: true
+  request url, (error, response, body) -> # Request image JSON.
+    callback(!error && response.statusCode == 200)
 
 
 # Adds an image as an asset.
@@ -224,26 +244,32 @@ install = () -> grab image for image in config.images
 # @param [Object] args the arguments to the program
 #
 add = (args) ->
-  id = args[3]
-
-  # Check resolution.
-  res = args[4]
-  if !isValidResolution res
-    log.error "That resolution '#{res}' isn't valid."
-    return false
-
-  # Add new image to configuration file.
-  image =
-    id: id
-    resolution: getResolutionCode res
-    destination: args[5]
-  config.images.push image
-
-  persistProject() # Update configuration file.
-
-  log.info "Added image with ID '#{image.id}' as asset."
-
-  install() # Freshly install all images.
+  id = args[3] # ID should be fourth argument.
+  resolution = args[4] # Resolution code should be fifth argument.
+  destination = args[5] # File destination should be sixth argument.
+  if typeof id == 'undefined' \
+    || typeof resolution == 'undefined' \
+    || typeof destination == 'undefined'
+      log.error 'You didn\'t provide enough arguments! Like this:' \
+        + ' \'picksel add <id> <resolution> <destination>\'' # ID not passed in.
+  else
+    if isValidResolution resolution
+      validateId id, (success) ->
+        if success
+          image =
+            id: id
+            resolution: resolution
+            destination: destination
+          project.images.push image # Add new image to project file.
+          persistProject null, (err) -> # Update project file.
+            if err
+              log.error 'Error writing your project file to disk!'
+            else
+              log.info "Added image with ID '#{image.id}' as asset." # Success!
+        else
+          log.error "That ID #{id} isn't valid." # Invalid ID
+    else
+      log.error "That resolution '#{resolution}' isn't valid." # Bad resolution.
 
 
 # Removes an image from installed assets.
@@ -251,34 +277,53 @@ add = (args) ->
 # @param [Object] args the arguments to the program
 #
 remove = (args) ->
-  id = args[3]
-  images = config.images
-  filteredImages = images.filter (obj) -> obj.id != args[3]
-  if images.length == filteredImages.length
-    log.warning "Couldn't uninstall image with ID '#{id}' because it's not" \
-      + ' installed in the first place.'
+  id = args[3] # ID should be fourth argument.
+  if typeof id == 'undefined'
+    log.error 'You need to pass in the ID of the image to remove! Like this:' \
+      + ' \'picksel remove <id>\'' # ID not passed in.
   else
-    config.images = filteredImages
-    persistProject()
+    filtered = project.images.filter (obj) -> obj.id != id
+    if project.images.length == filtered.length
+      log.warning "Couldn't uninstall image with ID '#{id}' because it's not" \
+        + ' installed in the first place.' # Image to remove not installed.
+    else
+      project.images = filtered # Assign filtered image array to project.
+      persistProject null, (err) -> # Persist project file.
+        if err
+          log.error "Error writing your project file to disk!"
+        else
+          log.info "Image with ID #{id} uninstalled." # Success!
 
 
-# Attempts to load the user and dependency configuration files.
+# Attempts to load the user and project files.
 #
-loadConfig = () ->
-  if existsFile.sync USER_PATH
-    user = jsonfile.readFileSync USER_PATH
-  else
-    log.error "Couldn't find your '#{USER_PATH}' file to get your API key." \
-      + ' You should probably run \'picksel auth\' to set one up.'
-    return false
-  if existsFile.sync CONFIG_PATH
-    config = jsonfile.readFileSync CONFIG_PATH
-  else
-    log.error "Couldn't find your '#{CONFIG_PATH}' file with all your" \
-      + ' dependencies. You should probably run \'picksel init\' to set one' \
-      + ' up.'
-    return false
-  true
+loadWorkspace = (callback) ->
+  existsFile USER_PATH, (err, exists) -> # Check user file exists.
+    if exists
+      jsonfile.readFile USER_PATH, (err, userObj) -> # Read file.
+        if err
+          log.error "Couldn't read your '#{USER_PATH}' file!"
+          callback false # Error reading user file.
+        else
+          user = userObj # Store user object.
+          existsFile PROJECT_PATH, (err, exists) -> # Check project file exists.
+            if exists
+              jsonfile.readFile PROJECT_PATH, (err, projObj) -> # Read file.
+                if err
+                  log.error "Couldn't read your '#{PROJECT_PATH}' file!"
+                  callback false # Error reading project file.
+                else
+                  project = projObj # Store project object.
+                  callback true # Successfully read both files.
+            else
+              log.error "Couldn't find your '#{PROJECT_PATH}' file with all" \
+                + ' your dependencies. You should probably run \'picksel' \
+                + ' init\' to set one up.'
+              callback false # Error finding project file.
+    else
+      log.error "Couldn't find your '#{USER_PATH}' file to get your API key." \
+        + ' You should probably run \'picksel auth\' to set one up.'
+      callback false # Error finding user file.
 
 
 # Prompts the user to create a directory if it doesn't exist yet.
@@ -294,7 +339,7 @@ promptDirectoryCreation = (dir, callback) ->
       ask "Doesn't look like the #{dir} directory exists, create it? (y/n) ", \
         (answer) ->
           if yn answer # Create directory? Yes or no.
-            mkdirp dir, (err) ->
+            mkdir dir, (err) ->
               if err
                 log.error 'Couldn\'t create directory!'
                 callback err, false # Folder doesn't exist and wasn't created.
@@ -309,25 +354,25 @@ promptDirectoryCreation = (dir, callback) ->
 # Walks the user through initializing their project file.
 #
 init = () ->
-  existsFile CONFIG_PATH, (err, stats) -> # Check for an existing project file.
+  existsFile PROJECT_PATH, (err, stats) -> # Check for an existing project file.
     if stats
       log.warning 'Looks like this project has already been initialized for' \
         + ' Picksel.' # If file exists, inform user and abort.
     else
       log.info 'Let\'s initialize Picksel for this project...'
-      newProj = new ProjectConfiguration() # Initialize new project.
+      newProj = new Project() # Initialize new project.
       ask 'Relative to the current directory, where would you like to store' \
         + ' assets? ', (answer) ->
           promptDirectoryCreation answer, (err, exists) ->
             if !exists # Warn user about missing assets directory.
-              log.warning "The #{answer} directory isn't present on-disk. You" \
+              log.warning "The #{answer} directory isn't present on disk. You" \
                 + ' won\'t be able to install assets until it is.'
             newProj.directory = answer # Add asset path to project.
             persistProject newProj, (err) -> # Persist new project file.
               if err
                 log.error 'Error writing your project file to disk!'
               else
-                log.info "New file created at '#{CONFIG_PATH}' for holding" \
+                log.info "New file created at '#{PROJECT_PATH}' for holding" \
                   + ' your asset dependencies. Feel free to check this file' \
                   + ' in to source control.' # Project setup success!
 
@@ -399,8 +444,11 @@ switch process.argv[2]
   when 'init' then init()
   when 'auth' then auth()
   else
-    if loadConfig()
-      switch process.argv[2]
-        when 'install' then install()
-        when 'add' then add process.argv
-        when 'remove' then remove process.argv
+    loadWorkspace (success) ->
+      if success
+        switch process.argv[2]
+          when 'install' then install()
+          when 'add' then add process.argv
+          when 'remove' then remove process.argv
+      else
+        log.error "Couldn't load workspace for above reason. Terminating."
