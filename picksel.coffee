@@ -71,11 +71,12 @@ ask = (question, callback) ->
 #
 # @param [String] apiKey the API key to use for the request
 # @param [Number] id the ID of the image to get information for
-# @param [Number] res the resolution code of the image to get
+# @param [Number] resolution the resolution code of the image to get
 #
-buildUrl = (apiKey, id, res) ->
+buildUrl = (apiKey, id, resolution) ->
+  code = humanResolutionToCode resolution
   "https://pixabay.com/api/?key=#{apiKey}" \
-    + (if res > 1 then '&response_group=high_resolution' else '') \
+    + (if code > 1 then '&response_group=high_resolution' else '') \
     + "&id=#{id}"
 
 
@@ -264,7 +265,7 @@ isNumeric = (str) -> /^\d+$/.test str
 # @param [String] id the ID to check
 #
 validateId = (id, callback) ->
-  url = buildUrl user.apiKey, id, (if isNumeric then 0 else 2) # Hash ID?
+  url = buildUrl user.apiKey, id, (if isNumeric(id) then 0 else 2) # Hash ID?
   requestJson url, (error, response, body) -> # Request image JSON.
     callback(!error && response.statusCode == 200)
 
