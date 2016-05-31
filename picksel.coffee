@@ -15,14 +15,19 @@ existsFile = require 'exists-file'
 md5File = require 'md5-file'
 filedel = require 'filedel'
 fileMove = require 'file-move'
-readline = require 'readline-sync'
-i18n = require("i18n");
+i18n = require 'i18n'
+#pixabay = require 'pixabayjs'
+yn = require 'yn'
+mkdirp = require 'mkdir-p'
+
+readline = require 'readline'
+
 
 locales = [
   'en'
   'eo'
 ]
-i18nconfig = 
+i18nconfig =
   locales: locales
   directory: './locales'
 i18n.configure i18nconfig
@@ -64,12 +69,25 @@ humanResolutions = [
 ]
 
 
+class ProjectConfiguration
+  constructor: () ->
+    @directory = ''
+    @images = []
+
 # Redacts the user's API key from the given URL.
 #
 # @param [String] url the URL to redact the API key from
 #
 redactApiKey = (url) -> url.replace user.apiKey, '********'
 
+ask = (question, callback) ->
+  readlineOptions =
+    input: process.stdin
+    output: process.stdout
+  rl = readline.createInterface readlineOptions
+  rl.question question, (answer) ->
+    rl.close()
+    callback answer
 
 # Builds a URL for downloading image information.
 #
@@ -82,7 +100,7 @@ buildUrl = (apiKey, id, res) ->
     + (if res > 1 then '&response_group=high_resolution' else '') \
     + "&id=#{id}"
 
-    
+
 # Checks whether or not a human-readable resolution name is valid.
 #
 # @param [Number] res the resolution code to check.
@@ -106,18 +124,20 @@ persist = (obj, filename) ->
   options =
     spaces: 4
   jsonfile.writeFileSync filename, obj, options
-  
-  
+
+
 # Persists the currently loaded configuration settings
 #
-persistConfig = () -> persist config, CONFIG_PATH
+persistProject = (obj) ->
+  if obj then config = obj # Replace loaded config.
+  persist config, CONFIG_PATH
 
 
 # Persists the currently loaded user settings.
 #
 persistUser = () -> persist user, USER_PATH
 
-    
+
 # Returns true if a request to the Pixabay API was successful.
 #
 # @param [Object] error any error returned with the response
@@ -129,8 +149,8 @@ isSuccessful = (error, body) ->
   && body.hits \
   && body.hits instanceof Array \
   && body.hits.length > 0
-  
-    
+
+
 # Downloads an image.
 #
 # @param [String] id the Pixabay image ID
@@ -138,43 +158,43 @@ isSuccessful = (error, body) ->
 # @param [String] destination the path of the destination file
 #
 download = (id, resolution, destination) ->
-  
+
   # Build URL for API request.
   url = buildUrl(user.apiKey, id, resolution)
-  
+
   log.info i18n.__('Requesting information for image from %s', \
                    redactApiKey(url))
-    
+
   # Call out to Pixabay for JSON.
   options =
     url: url
     json: true
   request options, (error, response, body) ->
-    
+
     # On success.
     if isSuccessful error, body
-      
+
       # Get URL of image at correct resolution.
       url = body.hits[0][resolutions[resolution]]
-      
+
       log.info i18n.__('Downloading image file from %s', url)
-      
+
       # Request image from Pixabay.
       tempDestination = destination + '.pickseltemp'
       file = fs.createWriteStream tempDestination
       req = https.get url, (response) ->
-        
+
         # Write to temporary file.
         stream = response.pipe file
         stream.on 'finish', () ->
-          
+
           # Does file currently exist at destination?
           exists = existsFile.sync(destination)
-          
+
           # Hash temp file (and existing file if possible).
           existingHash = if exists then md5File.sync(destination) else ''
           tempHash = md5File.sync(tempDestination)
-          
+
           # If file currently exists and hashes don't match, don't overwrite.
           if exists && existingHash != tempHash
             log.warning "Looks like '#{destination}' has been modified (MD5" \
@@ -188,8 +208,8 @@ download = (id, resolution, destination) ->
     else
       # Download failed.
       log.error "Couldn't get information about image with ID '#{id}'"
-        
-      
+
+
 # Installs a single image.
 #
 # @param [Object] image the image to grab
@@ -199,7 +219,7 @@ grab = (image) ->
     + "#{humanResolutions[image.resolution]} to #{path}"
   download image.id, image.resolution, path
 
-  
+
 # Installs all images present in the currently loaded configuration.
 #
 install = () -> grab image for image in config.images
@@ -211,27 +231,27 @@ install = () -> grab image for image in config.images
 #
 add = (args) ->
   id = args[3]
-   
+
   # Check resolution.
   res = args[4]
   if !isValidResolution res
     log.error "That resolution '#{res}' isn't valid."
     return false
-  
+
   # Add new image to configuration file.
   image =
     id: id
     resolution: getResolutionCode res
     destination: args[5]
   config.images.push image
-  
-  persistConfig() # Update configuration file.
-  
+
+  persistProject() # Update configuration file.
+
   log.info "Added image with ID '#{image.id}' as asset."
-  
+
   install() # Freshly install all images.
-     
-     
+
+
 # Removes an image from installed assets.
 #
 # @param [Object] args the arguments to the program
@@ -245,9 +265,9 @@ remove = (args) ->
       + ' installed in the first place.'
   else
     config.images = filteredImages
-    persistConfig()
-     
-      
+    persistProject()
+
+
 # Attempts to load the user and dependency configuration files.
 #
 loadConfig = () ->
@@ -265,65 +285,86 @@ loadConfig = () ->
       + ' up.'
     return false
   true
-     
-    
-# Walks the user through initializing their dependency file.
+
+
+# Prompts the user to create a directory if it doesn't exist yet.
+#
+# @param [String] dir the path of the directory
+# @param [Function] callback a callback function
+#
+promptDirectoryCreation = (dir, callback) ->
+  existsFile dir, (err, exists) -> # Does folder exist already?
+    if err || exists
+      callback err, exists # Folder exists already, or error.
+    else
+      ask "Doesn't look like the #{dir} directory exists, create it?", \
+        (answer) ->
+          if yn answer # Create directory? Yes or no.
+            mkdirp dir, (err) ->
+              if err
+                log.error 'Couldn\'t create directory!'
+                callback err, false # Folder doesn't exist and wasn't created.
+              else
+                log.info "Directory created!"
+                callback err, true # Folder didn't exist but was created.
+          else
+            log.info "Okay, the directory won't be created."
+            callback null, false # User opted out of creation.
+
+
+# Walks the user through initializing their project file.
 #
 init = () ->
-  
-  # Check we're not going to overwrite an existing project file.
-  if existsFile.sync CONFIG_PATH
-    log.warning 'Looks like this project has already been initialized for' \
-      + ' Picksel.'
-      return false
-    
-  newConfig =
-    directory: ''
-    images: []
-    
-  console.log 'Let\'s initialize Picksel for this project...'
-  
-  directory = readline.question 'Relative to the current directory, where' \
-    + ' would you like to store assets? '
-  newConfig.directory = directory
-  
-  # Persist config file.
-  config = newConfig
-  persistConfig()
-  
-  log.info "New file created at '#{CONFIG_PATH}' for holding your" \
-    + ' asset dependencies. Feel free to check this file in to source control.'
-    
- 
+  existsFile CONFIG_PATH, (err, stats) -> # Check for an existing project file.
+    if stats
+      log.warning 'Looks like this project has already been initialized for' \
+        + ' Picksel.' # If file exists, inform user and abort.
+    else
+      log.info 'Let\'s initialize Picksel for this project...'
+      newProj = new ProjectConfiguration() # Initialize new project.
+      ask 'Relative to the current directory, where would you like to store' \
+        + ' assets? ', (answer) ->
+          promptDirectoryCreation answer, (err, exists) ->
+            if !exists # Warn user about missing assets directory.
+              log.warning "The #{answer} directory isn't present on-disk. You" \
+                + " won't be able to install assets until it is."
+            newProj.directory = answer # Add asset path to project.
+            persistProject newProj # Persist new project file.
+            log.info "New file created at '#{CONFIG_PATH}' for holding your" \
+              + ' asset dependencies. Feel free to check this file in to' \
+              + ' source control.' # Project setup success!
+
+
 # Walks the user through initializing their user file.
 #
 auth = () ->
-  
+
   # Check we're not going to overwrite an existing user file.
   if existsFile.sync USER_PATH
     log.warning 'Looks like authentication is already set up for this project.'
     return false
-    
+
   newUser =
     apiKey: ''
-    
+
   console.log 'Let\'s associate a Pixabay account with your local copy of' \
     + ' this project...'
-  
+
   apiKey = readline.question 'What\'s your Pixabay API key? To find it you' \
     + ' can log in to the Pixabay website and visit: ' \
     + 'https://pixabay.com/api/docs/ '
+  # TODO: Validate API key?
   newUser.apiKey = apiKey
-  
+
   # Persist user file.
   user = newUser
   persistUser()
-  
+
   log.info "New file created at '#{USER_PATH}' containing your API key." \
     + " DON'T CHECK THIS FILE IN TO SOURCE CONTROL BECAUSE IT HAS YOUR" \
     + " SECRET API KEY IN IT."
-  
-  
+
+
 # Prints usage information for the application.
 #
 help = () ->
@@ -341,8 +382,8 @@ help = () ->
     + '    dest The file path to install the image to\n' \
     + '  remove <id>           Removes a dependency on an asset\n' \
     + '    id   The (hash) ID of the image to remove from dependencies'
-  
-    
+
+
 # Interpret commands.
 switch process.argv[2]
   when 'help' then help()
@@ -354,4 +395,3 @@ switch process.argv[2]
         when 'install' then install()
         when 'add' then add process.argv
         when 'remove' then remove process.argv
-        
