@@ -271,6 +271,19 @@ validateId = (id, callback) ->
     callback(!error && response.statusCode == 200)
 
 
+# Checks whether or not a dependency is already present.
+#
+# @param [Number] id the ID of the dependency to check for
+# @param [String] id the resolution of the dependency to check for
+# @param [Destination] id the destination of the dependency to check for
+#
+alreadyHasImage = (id, resolution, destination) ->
+  duplicates = project.images.filter (obj) ->
+    (obj.id == id && obj.resolution == resolution) || \
+    obj.destination == destination
+  duplicates.length > 0
+
+
 # Adds an image as an asset.
 #
 # @param [Object] args the arguments to the program
@@ -285,23 +298,29 @@ add = (args) ->
       log.error 'You didn\'t provide enough arguments! Like this:' \
         + ' \'picksel add <id> <resolution> <destination>\'' # ID not passed in.
   else
-    if isValidResolutionCode resolution
-      validateId id, (success) ->
-        if success
-          image =
-            id: id
-            resolution: resolution
-            destination: destination
-          project.images.push image # Add new image to project file.
-          persistProject null, (err) -> # Update project file.
-            if err
-              log.error 'Error writing your project file to disk!'
-            else
-              log.info "Added image with ID '#{image.id}' as asset." # Success!
-        else
-          log.error "That ID #{id} isn't valid." # Invalid ID
+    if alreadyHasImage id, resolution, destination
+      log.warning 'A conflicting dependency is already present in your' \
+        + ' project!' # No exact duplicates.
     else
-      log.error "That resolution '#{resolution}' isn't valid." # Bad resolution.
+      if isValidResolutionCode resolution
+        validateId id, (success) ->
+          if success
+            image =
+              id: id
+              resolution: resolution
+              destination: destination
+            project.images.push image # Add new image to project file.
+            persistProject null, (err) -> # Update project file.
+              if err
+                log.error 'Error writing your project file to disk!'
+              else
+                # Success!
+                log.info "Added image with ID '#{image.id}' as asset."
+          else
+            log.error "That ID #{id} isn't valid." # Invalid ID
+      else
+        # Bad resolution.
+        log.error "That resolution '#{resolution}' isn't valid."
 
 
 # Removes an image from installed assets.
