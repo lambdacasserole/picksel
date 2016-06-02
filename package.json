@@ -1,6 +1,6 @@
 {
   "name": "picksel",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Asset manager for pulling down Pixabay images.",
   "main": "lib/picksel.js",
   "scripts": {
