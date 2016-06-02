@@ -187,7 +187,7 @@ requestJson = (url, callback) ->
 # Downloads an image.
 #
 # @param [String] id the Pixabay image ID
-# @param [Number] resolution the resolution to download the image in
+# @param [String] resolution the resolution to download the image in
 # @param [String] destination the path of the destination file
 #
 download = (id, resolution, destination) ->
@@ -265,7 +265,8 @@ isNumeric = (str) -> /^\d+$/.test str
 # @param [String] id the ID to check
 #
 validateId = (id, callback) ->
-  url = buildUrl user.apiKey, id, (if isNumeric(id) then 0 else 2) # Hash ID?
+  # Hash ID?
+  url = buildUrl user.apiKey, id, (if isNumeric(id) then 'tiny' else 'large')
   requestJson url, (error, response, body) -> # Request image JSON.
     callback(!error && response.statusCode == 200)
 
