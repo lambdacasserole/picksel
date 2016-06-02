@@ -41,7 +41,7 @@ picksel install
 To do the heavy lifting of downloading your image assets and putting them in the right place.
 
 ## Remember!
-To download pictures in any resolution higher than 'small' you will need to have your API access elevated by a member of the team at Pixabay. You can [ask for elevated API access on the Pixabay website](https://pixabay.com/en/service/contact/?full_api_access).
+To download pictures in any resolution higher than 'small' you will need to have your API access elevated by a member of the team at Pixabay. You can [ask for elevated API access on the Pixabay website](https://pixabay.com/en/service/contact/?full_api_access). If this problem is raised on GitHub as an issue it'll be immediately closed. It's out of my hands.
 
 ## Contributing
 At the risk of being swarmed by an angry mob of Node.js developers, I'm going to admit that Picksel is written in CoffeeScript. The built JavaScript is distributed on npm. Comments, suggestions and pull requests are very welcome.
