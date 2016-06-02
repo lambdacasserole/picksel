@@ -45,3 +45,9 @@ To download pictures in any resolution higher than 'small' you will need to have
 
 ## Contributing
 At the risk of being swarmed by an angry mob of Node.js developers, I'm going to admit that Picksel is written in CoffeeScript. The built JavaScript is distributed on npm. Comments, suggestions and pull requests are very welcome.
+
+## Acknowledgements
+Big shout-out and much love to Pixabay for providing an awesome website and API to program against. Visit them for [loads of free public domain stock photos, videos and more](https://pixabay.com/). 
+
+## Disclaimer
+PICKSEL AND ITS AUTHOR(S) ARE NOT AFFILIATED WITH PIXABAY AND ALL OTHER PIXABAY PRODUCT NAMES ARE TRADEMARKS OR REGISTERED TRADEMARKS OF BRAXMEIER & STEINBERGER GBR. ALL OTHER COMPANY AND PRODUCT NAMES ARE TRADEMARKS OR REGISTERED TRADEMARKS OF THEIR RESPECTIVE COMPANIES.
