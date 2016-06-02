@@ -29,7 +29,7 @@ This will initialize your project for use with Picksel.
 To add a Pixabay image as an asset dependency, use the following command:
 
 ```
-picksel add bb4b32cd96264150 small flowers.jpg
+picksel add 195893 small flowers.jpg
 ```
 
 In the above command we specify the hash ID of the image on Pixabay, the resolution to download it at, and the name of the destination file on disk. Once you're happy with your dependencies, run:
