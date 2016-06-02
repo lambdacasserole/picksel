@@ -447,11 +447,27 @@ auth = () ->
               log.error "That API key didn't work with Pixabay!"
 
 
+# Prints the application's title card along with a legal disclaimer.
+#
+printTitleCard = () ->
+  console.log 'Picksel Asset Manager\n' \
+    + 'PICKSEL AND ITS AUTHOR(S) ARE NOT AFFILIATED WITH PIXABAY AND ALL' \
+    + ' OTHER PIXABAY PRODUCT NAMES ARE TRADEMARKS OR REGISTERED TRADEMARKS' \
+    + ' OF BRAXMEIER & STEINBERGER GBR. ALL OTHER COMPANY AND PRODUCT NAMES' \
+    + ' ARE TRADEMARKS OR REGISTERED TRADEMARKS OF THEIR RESPECTIVE' \
+    + ' COMPANIES.'
+
+
+# Prints attribution information as required by Pixabay.
+printAttribution = () ->
+  console.log 'Picksel is powered by Pixabay and their API. Visit Pixabay at' \
+    + ' https://pixabay.com/ for thousands of free public domain stock images.'
+
+
 # Prints usage information for the application.
 #
 help = () ->
-  console.log 'Picksel Asset Manager\n' \
-    + 'Usage: picksel <command> <args> \n' \
+  console.log 'Usage: picksel <command> <args> \n' \
     + 'Commands:\n' \
     + '  help                  Shows usage information for the application\n' \
     + '  init                  Set up this directory for Picksel\n' \
@@ -464,6 +480,10 @@ help = () ->
     + '    dest The file path to install the image to\n' \
     + '  remove <id>           Removes a dependency on an asset\n' \
     + '    id   The (hash) ID of the image to remove from dependencies'
+
+
+# Print title card with legal stuff.
+printTitleCard()
 
 
 # Interpret commands.
@@ -481,3 +501,7 @@ switch process.argv[2]
       else
         # Workspace needs setting up first.
         log.error "Couldn't load workspace for above reason. Terminating."
+
+
+# Print attribution stuff.
+printAttribution()
