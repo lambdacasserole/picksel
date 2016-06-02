@@ -434,9 +434,15 @@ init = () ->
 # @param [Function] callback the function to call back on
 #
 validateApiKey = (key, callback) ->
-  url = buildUrl key, '195893', 0 # We know this image exists.
+  url = buildUrl key, '195893', 'tiny' # We know this image exists.
   requestJson url, (error, response, body) -> # Request image JSON.
-    callback(!error && response.statusCode == 200)
+    success = !error && response.statusCode == 200
+    if success
+      url = buildUrl key, 'bb4b32cd96264150', 'large' # Known HD image.
+      requestJson url, (error, response, body) ->
+        callback true, (!error && response.statusCode == 200)
+    else
+      callback false, false # No API access, no elevated access.
 
 
 # Walks the user through initializing their user file.
@@ -453,8 +459,13 @@ auth = () ->
       ask 'What\'s your Pixabay API key? To find it you can log in to the' \
         + ' Pixabay website and visit: https://pixabay.com/api/docs/ ', \
         (answer) ->
-          validateApiKey answer, (success) -> # Check API key works.
+          validateApiKey answer, (success, elevated) -> # Check API key works.
             if success
+              if !elevated
+                log.warning 'WHILE THIS API KEY WORKED, IT DOESN\'T HAVE' \
+                  + ' ELEVATED PERMISSIONS. Ask Pixabay for permission to' \
+                  + ' to access high quality images or you\'re limited to' \
+                  + ' small images only.'
               newUser.apiKey = answer # Add API key to user.
               persistUser newUser, (err) -> # Persist new user file.
                 if err
