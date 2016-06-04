@@ -15,6 +15,8 @@ fileMove = require 'file-move'
 yn = require 'yn'
 mkdir = require 'mkdir-p'
 readline = require 'readline'
+async = require 'async'
+jimp = require 'jimp'
 
 
 # Space for workspace files.
@@ -78,6 +80,19 @@ buildUrl = (apiKey, id, resolution) ->
   "https://pixabay.com/api/?key=#{apiKey}" \
     + (if code > 1 then '&response_group=high_resolution' else '') \
     + "&id=#{id}"
+
+
+# Builds a search URL for downloading image information.
+#
+# @param [String] apiKey the API key to use for the request
+# @param [Number] term the search term to use to query the API
+# @param [Number] resolution the resolution code to perform the search at
+#
+buildSearchUrl = (apiKey, term, resolution) ->
+  code = humanResolutionToCode resolution
+  "https://pixabay.com/api/?key=#{apiKey}" \
+    + (if code > 1 then '&response_group=high_resolution' else '') \
+    + "&q=#{term}"
 
 
 # Translates a resolution code to an API resolution.
@@ -182,6 +197,105 @@ requestJson = (url, callback) ->
     url: url
     json: true
   request options, callback
+
+
+# Returns the closest match from an array of matches (recursive).
+#
+# @param [Array] matches the array of matches to examine
+# @param [Object] closest the current closest match
+#
+closestMatch = (matches, closest) ->
+  if matches.length == 0 then return closest
+  next = matches.pop()
+  best = if closest && closest.distance <= next.distance then closest else next
+  closestMatch matches, best
+
+
+# Derives a search term to feed back in to the API from a hit.
+#
+# @param [Object] hit the hit to derive the search term for
+#
+deriveSearchTerm = (hit) ->
+  search = hit.tags.replace new RegExp(', ', 'g'), '+' # Turn tags into term.
+  while search.length > 100 # Conform to 100-character limit.
+    terms = search.split '+'
+    terms.pop() # Knock off one tag at a time.
+    search = terms.join '+'
+  return search
+
+
+# Downloads the file at a URL to disk.
+#
+# @param [String] url the URL to download from
+# @param [String] dest the destination file on disk
+# @param [Function] callback the function to call back on
+#
+downloadToDisk = (url, dest, callback) ->
+  https.get url, (response) ->
+    if response.statusCode == 200
+      stream = response.pipe fs.createWriteStream(dest)
+      stream.on 'close', () ->
+        callback null, url, dest # TODO: Gonna drop an error here.
+    else
+      callback error, url, dest
+
+
+# Downloads an image file from a URL and opens it.
+#
+# @param [String] url the URL to download the image from
+# @param [String] dest the destination file on disk
+# @param [Function] callback the function to call back on
+#
+downloadAndOpenImage = (url, dest, callback) ->
+  downloadToDisk url, dest, (error, url, dest) ->
+    jimp.read dest, callback
+
+
+# Tries to derive the hash ID of the image with the given numeric ID.
+#
+# @param [Number] id the ID of the image to get
+# @param [Function] callback the function to call back on
+#
+idToHashId = (id, callback) ->
+  url = buildUrl user.apiKey, id, 'tiny' # Initial query for image info.
+  requestJson url, (error, response, body) ->
+    if !error && response.statusCode == 200
+      downloadAndOpenImage body.hits[0].previewURL, "./pickseltemp_base.jpg", (err, baseImg) ->
+          # Convert tags to search term.
+          search = deriveSearchTerm body.hits[0]
+          url = buildSearchUrl user.apiKey, search, 'full'
+          requestJson url, (error, response, body) -> # Feed tags back in to search.
+            if !error && response.statusCode == 200 && body.hits.length > 0
+              if body.hits.length == 1
+                callback null, body.hits[0].id_hash # One result, this must be it.
+              else
+                # Results are ambiguous, things get *way* more complicated.
+                mkdir './picksel_temp', (error) -> # Create temporary folder.
+                  if error
+                    callback error, null # Couldn't create folder.
+                  else
+                    files = []
+                    getFile = (item, callback) ->
+                      req = request item.previewURL
+                      dest = "./picksel_temp/#{item.id_hash}.jpg"
+                      files.push {filename:dest, hash:item.id_hash}
+                      stream = req.pipe fs.createWriteStream(dest)
+                      stream.on 'close', callback
+                    onGotAllFiles = () ->
+                      percs = []
+                      perc = (file, callback) ->
+                        jimp.read file.filename, (err, img) ->
+                          percs.push {hash: file.hash,distance:jimp.distance(baseImg, img)}
+                          callback()
+                      percDone = () ->
+                        filedel './picksel_temp'
+                        callback null, closestMatch(percs).hash
+                      async.eachSeries files,perc,percDone
+                    async.eachSeries body.hits, getFile, onGotAllFiles
+            else
+              callback error, null # Error during search.
+    else
+      callback error, null # Error getting JSON in the first place.
 
 
 # Downloads an image.
@@ -529,6 +643,7 @@ switch process.argv[2]
           when 'install' then install() # Install assets.
           when 'add' then add process.argv # Add asset.
           when 'remove' then remove process.argv # Remove asset.
+          when 'test' then idToHashId '195893', (err, id) -> console.log id
       else
         # Workspace needs setting up first.
         log.error "Couldn't load workspace for above reason. Terminating."
