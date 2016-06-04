@@ -284,7 +284,7 @@ idToHashId = (id, callback) ->
                       percs = []
                       perc = (file, callback) ->
                         jimp.read file.filename, (err, img) ->
-                          percs.push {hash: file.hash,distance:jimp.distance(baseImg, img)}
+                          percs.push {hash: file.hash,distance:jimp.distance(base, img)}
                           callback()
                       percDone = () ->
                         filedel './picksel_temp'
