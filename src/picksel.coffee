@@ -246,7 +246,7 @@ downloadToDisk = (url, dest, callback) ->
 # @param [String] dest the destination file on disk
 # @param [Function] callback the function to call back on
 #
-downloadAndOpenImage = (url, dest, callback) ->
+requestImage = (url, dest, callback) ->
   downloadToDisk url, dest, (error, url, dest) ->
     jimp.read dest, callback
 
@@ -260,14 +260,14 @@ idToHashId = (id, callback) ->
   url = buildUrl user.apiKey, id, 'tiny' # Initial query for image info.
   requestJson url, (error, response, body) ->
     if !error && response.statusCode == 200
-      downloadAndOpenImage body.hits[0].previewURL, "./pickseltemp_base.jpg", (err, baseImg) ->
-          # Convert tags to search term.
-          search = deriveSearchTerm body.hits[0]
+      hit = body.hits[0]
+      requestImage hit.previewURL, "./pickseltemp_base.jpg", (err, base) ->
+          search = deriveSearchTerm hit # Convert tags to search term.
           url = buildSearchUrl user.apiKey, search, 'full'
-          requestJson url, (error, response, body) -> # Feed tags back in to search.
+          requestJson url, (error, response, body) -> # Feed tags back in.
             if !error && response.statusCode == 200 && body.hits.length > 0
               if body.hits.length == 1
-                callback null, body.hits[0].id_hash # One result, this must be it.
+                callback null, body.hits[0].id_hash # One result, simple!
               else
                 # Results are ambiguous, things get *way* more complicated.
                 mkdir './picksel_temp', (error) -> # Create temporary folder.
@@ -276,7 +276,6 @@ idToHashId = (id, callback) ->
                   else
                     files = []
                     getFile = (item, callback) ->
-                      req = request item.previewURL
                       dest = "./picksel_temp/#{item.id_hash}.jpg"
                       files.push {filename:dest, hash:item.id_hash}
                       stream = req.pipe fs.createWriteStream(dest)
