@@ -17,6 +17,7 @@ mkdir = require 'mkdir-p'
 readline = require 'readline'
 async = require 'async'
 jimp = require 'jimp'
+rimraf = require 'rimraf'
 
 
 # Space for workspace files.
@@ -276,6 +277,7 @@ idToHashId = (id, callback) ->
                   else
                     files = []
                     getFile = (item, callback) ->
+                      req = request item.previewURL
                       dest = "./picksel_temp/#{item.id_hash}.jpg"
                       files.push {filename:dest, hash:item.id_hash}
                       stream = req.pipe fs.createWriteStream(dest)
@@ -283,13 +285,19 @@ idToHashId = (id, callback) ->
                     onGotAllFiles = () ->
                       percs = []
                       perc = (file, callback) ->
-                        jimp.read file.filename, (err, img) ->
-                          percs.push {hash: file.hash,distance:jimp.distance(base, img)}
-                          callback()
-                      percDone = () ->
-                        filedel './picksel_temp'
+                        jimp.read file.filename, (error, img) ->
+                          if error
+                            callback error
+                          else
+                            perc =
+                              hash: file.hash
+                              distance: jimp.distance base, img
+                            percs.push perc
+                            callback null
+                      percDone = (err) ->
+                        rimraf './picksel_temp/*'
                         callback null, closestMatch(percs).hash
-                      async.eachSeries files,perc,percDone
+                      async.eachSeries files, perc, percDone
                     async.eachSeries body.hits, getFile, onGotAllFiles
             else
               callback error, null # Error during search.
