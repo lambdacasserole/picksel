@@ -26,11 +26,13 @@ project = null
 
 
 # Initialize logging
-Log = require 'log-color-optionaldate'
+Log = require 'log-color-plusplus'
 logSettings =
   level: 'debug'
   color: true
   date: false
+  wrap: true
+  width: 70
 log = new Log logSettings
 
 # Represents a Picksel project.
@@ -61,10 +63,10 @@ redactApiKey = (url) -> url.replace user.apiKey, '********'
 # @param [Function] callback the function to call back on
 #
 ask = (question, callback) ->
-  readlineOptions =
+  options =
     input: process.stdin
     output: process.stdout
-  reader = readline.createInterface readlineOptions
+  reader = readline.createInterface options
   reader.question question, (answer) ->
     reader.close() # Close before passing answer to callback.
     callback answer
@@ -602,24 +604,33 @@ auth = () ->
 # Prints the application's title card along with a legal disclaimer.
 #
 printTitleCard = () ->
-  console.log 'Picksel Asset Manager\n' \
-    + 'PICKSEL AND ITS AUTHOR(S) ARE NOT AFFILIATED WITH PIXABAY AND ALL' \
-    + ' OTHER PIXABAY PRODUCT NAMES ARE TRADEMARKS OR REGISTERED TRADEMARKS' \
-    + ' OF BRAXMEIER & STEINBERGER GBR. ALL OTHER COMPANY AND PRODUCT NAMES' \
-    + ' ARE TRADEMARKS OR REGISTERED TRADEMARKS OF THEIR RESPECTIVE' \
-    + ' COMPANIES.'
+  console.log '______ _      _             _\n' \
+    + '| ___ (_)    | |           | |\n' \
+    + '| |_/ /_  ___| | _____  ___| |\n' \
+    + '|  __/| |/ __| |/ / __|/ _ \\ |\n' \
+    + '| |   | | (__|   <\\__ \\  __/ |\n' \
+    + '\\_|   |_|\\___|_|\\_\\___/\\___|_|\n' \
+    + '            Asset Manager v1.2\n'
+  log.print 'PICKSEL AND ITS AUTHOR(S) ARE NOT AFFILIATED WITH PIXABAY AND' \
+    + ' ALL OTHER PIXABAY PRODUCT NAMES ARE TRADEMARKS OR REGISTERED' \
+    + ' TRADEMARKS OF BRAXMEIER & STEINBERGER GBR. ALL OTHER COMPANY AND' \
+    + ' PRODUCT NAMES ARE TRADEMARKS OR REGISTERED TRADEMARKS OF THEIR' \
+    + ' RESPECTIVE COMPANIES.\n'
 
 
 # Prints attribution information as required by Pixabay.
 printAttribution = () ->
-  console.log 'Picksel is powered by Pixabay and their API. Visit Pixabay at' \
-    + ' https://pixabay.com/ for thousands of free public domain stock images.'
+  log.print 'Picksel is powered by Pixabay and their API. Visit Pixabay at' \
+    + ' https://pixabay.com/ for thousands of free public domain stock' \
+    + ' images.\n'
 
 
 # Prints usage information for the application.
 #
 help = () ->
-  console.log 'Usage: picksel <command> <args> \n' \
+  printTitleCard() # Print title card with legal stuff.
+  printAttribution() # Print attribution stuff.
+  console.log 'Usage: picksel <command> <args> \n\n' \
     + 'Commands:\n' \
     + '  help                  Shows usage information for the application\n' \
     + '  init                  Set up this directory for Picksel\n' \
@@ -632,10 +643,6 @@ help = () ->
     + '    dest The file path to install the image to\n' \
     + '  remove <id>           Removes a dependency on an asset\n' \
     + '    id   The (hash) ID of the image to remove from dependencies'
-
-
-# Print title card with legal stuff.
-printTitleCard()
 
 
 # Interpret commands.
@@ -654,7 +661,3 @@ switch process.argv[2]
       else
         # Workspace needs setting up first.
         log.error "Couldn't load workspace for above reason. Terminating."
-
-
-# Print attribution stuff.
-printAttribution()
