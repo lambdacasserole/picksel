@@ -1,6 +1,8 @@
 # Constants.
 USER_PATH = './.pickselacc' # Location of user file.
 PROJECT_PATH = './picksel.json' # Location of project file.
+AMBIG_DIR = './picksel_temp' # Location of ambiguous result resolution folder.
+AMBIG_BASE_PATH = './pickseltemp_base.temp' # Location of base image file.
 
 # Load dependencies.
 https = require 'https'
@@ -75,7 +77,7 @@ ask = (question, callback) ->
 #
 # @param [String] apiKey the API key to use for the request
 # @param [Number] id the ID of the image to get information for
-# @param [Number] resolution the resolution code of the image to get
+# @param [String] resolution the human-readable resolution required
 #
 buildUrl = (apiKey, id, resolution) ->
   code = humanResolutionToCode resolution
@@ -87,8 +89,8 @@ buildUrl = (apiKey, id, resolution) ->
 # Builds a search URL for downloading image information.
 #
 # @param [String] apiKey the API key to use for the request
-# @param [Number] term the search term to use to query the API
-# @param [Number] resolution the resolution code to perform the search at
+# @param [String] term the search term to use to query the API
+# @param [String] resolution the human-readable resolution required
 #
 buildSearchUrl = (apiKey, term, resolution) ->
   code = humanResolutionToCode resolution
@@ -131,9 +133,9 @@ humanResolutionToCode = (resolution) ->
 
 # Checks whether or not a human-readable resolution name is valid.
 #
-# @param [Number] resolution the resolution code to check.
+# @param [String] resolution the human-readable resolution name to check
 #
-isValidResolutionCode = (resolution) -> humanResolutionToCode(resolution) > -1
+isValidResolution = (resolution) -> humanResolutionToCode(resolution) > -1
 
 
 # Persists an object to a file as JSON.
@@ -201,18 +203,6 @@ requestJson = (url, callback) ->
   request options, callback
 
 
-# Returns the closest match from an array of matches (recursive).
-#
-# @param [Array] matches the array of matches to examine
-# @param [Object] closest the current closest match
-#
-closestMatch = (matches, closest) ->
-  if matches.length == 0 then return closest
-  next = matches.pop()
-  best = if closest && closest.distance <= next.distance then closest else next
-  closestMatch matches, best
-
-
 # Derives a search term to feed back in to the API from a hit.
 #
 # @param [Object] hit the hit to derive the search term for
@@ -236,50 +226,129 @@ downloadToDisk = (url, dest, callback) ->
   https.get url, (response) ->
     if response.statusCode == 200
       stream = response.pipe fs.createWriteStream(dest)
+      stream.on 'error', (error) ->
+        callback error
       stream.on 'close', () ->
-        callback null, url, dest # TODO: Gonna drop an error here.
+        callback null
     else
-      callback true, url, dest # TODO: Error is true?
+      callback true # TODO: Error is true?
 
 
 # Downloads an image file from a URL and opens it.
 #
 # @param [String] url the URL to download the image from
-# @param [String] dest the destination file on disk
+# @param [String] filename the destination file on disk
 # @param [Function] callback the function to call back on
 #
-requestImage = (url, dest, callback) ->
-  downloadToDisk url, dest, (error, url, dest) ->
-    jimp.read dest, callback
+# @example How to call this function
+#   requestImage url, filename, (error, img) ->
+#     console.log img
+#
+requestImage = (url, filename, callback) ->
+  downloadToDisk url, filename, (error) ->
+    jimp.read filename, callback
 
 
-downloadHits = (hits, callback, files) ->
+# Caches the smallest resolution in a set of hits locally in a temporary folder.
+#
+# @param [Array] hits the hits to cache
+# @param [Function] callback the function to call back on
+# @param [Array] files used for head recursion
+#
+# @example How to call this function
+#   cacheHitsLocally hits, (error, files) ->
+#     console.log files
+#
+cacheHitsLocally = (hits, callback, files) ->
   if !files then files = [] # Initialize array for head recursion.
   if hits.length == 0
     callback null, files # Base case.
   else
-    item = hits.pop()
-    dest = "./picksel_temp/#{item.id_hash}.jpg"
-    files.push {filename:dest, hash:item.id_hash}
-    downloadToDisk item.previewURL, dest, (error, url, dest) ->
-      if !error
-        downloadHits hits, callback, files # Recursively process.
+    hit = hits.pop() # Take next hit.
+    filename = "#{AMBIG_DIR}/#{hit.id_hash}.temp"
+    file =
+      filename: filename
+      hash: hit.id_hash
+    files.push file # Push new file.
+    downloadToDisk hit.previewURL, filename, (error) ->
+      if error
+        callback error, null # Error during download.
       else
-        callback true, null
+        cacheHitsLocally hits, callback, files # Recursively process.
 
 
-matchImage = (base, files, callback, percs) ->
-  if !percs then percs = [] # Initialize array for head recursion.
+# Gets the perceptual distances for a set of image files from a base image.
+#
+# @param [Object] base the base image
+# @param [Array] files the files to compare to the base image
+# @param [Function] callback the function to call back on
+# @param [Array] distances used for head recursion
+#
+# @example How to call this function
+#   getDistances base, files, (error, distances) ->
+#     console.log distances
+#
+getDistances = (base, files, callback, distances) ->
+  if !distances then distances = [] # Initialize array for head recursion.
   if files.length == 0
-    callback null, percs # Base case.
+    callback null, distances # Base case.
   else
-    file = files.pop()
-    jimp.read file.filename, (error, img) ->
+    file = files.pop() # Take next file.
+    jimp.read file.filename, (error, img) -> # Load up next image.
       if error
         callback error, null
       else
-        percs.push {hash: file.hash, distance: jimp.distance(base, img)}
-        matchImage base, files, callback, percs
+        distance =
+          hash: file.hash
+          distance: jimp.distance base, img
+        distances.push distance # Push new distance.
+        getDistances base, files, callback, distances # Recurse.
+
+
+# Returns the closest match from an array of distances.
+#
+# @param [Array] matches the array of distances to examine
+# @param [Object] closest used for head recursion
+#
+getClosest = (matches, closest) ->
+  if matches.length == 0 then return closest # Base case.
+  next = matches.pop()
+  best = if closest && closest.distance <= next.distance then closest else next
+  getClosest matches, best
+
+
+# Reslolves an ambiguous set of image results encountered while attempting to
+# derive a hash ID from an ID.
+#
+# @param [Object] base the base image to compare
+# @param [Array] hits the ambiguous array of hits from the Pixabay API
+# @param [Function] callback the function to call back on
+#
+# @example How to call this function
+#   resolveAmbiguousResults base, hits, (error, hashId) ->
+#     console.log hashId
+#
+resolveAmbiguousResults = (base, hits, callback) ->
+  mkdir AMBIG_DIR, (error) -> # Create temporary folder.
+    if error
+      callback error, null # Couldn't create folder.
+    else
+      cacheHitsLocally hits, (error, files) ->
+        if error
+          log.error 'Couldn\'t download thumbnails for perceptual hashing.'
+          callback error, null # Failed, couldn't download files.
+        else
+          getDistances base, files, (error, distances) ->
+            rimraf AMBIG_DIR, fs, (error) -> # Delete temporary folder.
+              if error
+                log.warn "Couldn't clean up temporary folder at #{AMBIG_DIR}!"
+              else
+                rimraf AMBIG_BASE_PATH, fs, (error) -> # Delete temporary file.
+                  if error
+                    log.warn 'Couldn\'t clean up temporary file at' \
+                      + " #{AMBIG_BASE_PATH}!"
+                  else
+                    callback null, getClosest(distances).hash # Success!
 
 
 # Tries to derive the hash ID of the image with the given numeric ID.
@@ -287,12 +356,12 @@ matchImage = (base, files, callback, percs) ->
 # @param [Number] id the ID of the image to get
 # @param [Function] callback the function to call back on
 #
-idToHashId = (id, callback) ->
+deriveHashId = (id, callback) ->
   url = buildUrl user.apiKey, id, 'tiny' # Initial query for image info.
   requestJson url, (error, response, body) ->
     if !error && response.statusCode == 200
       hit = body.hits[0]
-      requestImage hit.previewURL, "./pickseltemp_base.jpg", (err, base) ->
+      requestImage hit.previewURL, AMBIG_BASE_PATH, (err, base) ->
           search = deriveSearchTerm hit # Convert tags to search term.
           url = buildSearchUrl user.apiKey, search, 'full'
           requestJson url, (error, response, body) -> # Feed tags back in.
@@ -301,17 +370,7 @@ idToHashId = (id, callback) ->
                 callback null, body.hits[0].id_hash # One result, simple!
               else
                 # Results are ambiguous, things get *way* more complicated.
-                mkdir './picksel_temp', (error) -> # Create temporary folder.
-                  if error
-                    callback error, null # Couldn't create folder.
-                  else
-                    downloadHits body.hits, (err, files) ->
-                      matchImage base, files, (err, percs) ->
-                        rimraf './picksel_temp', fs, () ->
-                          #WUT
-                        rimraf './pickseltemp_base.jpg', fs, () ->
-                          #WUT
-                        callback null, closestMatch(percs).hash
+                resolveAmbiguousResults base, body.hits, callback
             else
               callback error, null # Error during search.
     else
@@ -436,8 +495,9 @@ add = (args) ->
       log.warning 'A conflicting dependency is already present in your' \
         + ' project!' # No exact duplicates.
     else
-      if isValidResolutionCode resolution
+      if isValidResolution resolution
         validateId id, (success) ->
+          if
           if success
             image =
               id: id
@@ -668,7 +728,7 @@ switch process.argv[2]
           when 'install' then install() # Install assets.
           when 'add' then add process.argv # Add asset.
           when 'remove' then remove process.argv # Remove asset.
-          when 'test' then idToHashId '195893', (err, id) -> console.log id
+          when 'test' then deriveHashId '195893', (err, id) -> console.log id
       else
         # Workspace needs setting up first.
         log.error "Couldn't load workspace for above reason. Terminating."
