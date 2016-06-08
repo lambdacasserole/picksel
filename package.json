@@ -14,7 +14,6 @@
   "author": "Saul Johnson <saul.a.johnson@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "async": "^2.0.0-rc.5",
     "exists-file": "^2.0.0",
     "file-move": "0.0.3",
     "filedel": "^2.0.1",

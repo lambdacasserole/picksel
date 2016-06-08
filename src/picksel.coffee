@@ -2,7 +2,6 @@
 USER_PATH = './.pickselacc' # Location of user file.
 PROJECT_PATH = './picksel.json' # Location of project file.
 
-
 # Load dependencies.
 https = require 'https'
 fs = require 'fs'
@@ -15,7 +14,6 @@ fileMove = require 'file-move'
 yn = require 'yn'
 mkdir = require 'mkdir-p'
 readline = require 'readline'
-async = require 'async'
 jimp = require 'jimp'
 rimraf = require 'rimraf'
 
@@ -34,6 +32,7 @@ logSettings =
   wrap: true
   width: 70
 log = new Log logSettings
+
 
 # Represents a Picksel project.
 #
@@ -240,7 +239,7 @@ downloadToDisk = (url, dest, callback) ->
       stream.on 'close', () ->
         callback null, url, dest # TODO: Gonna drop an error here.
     else
-      callback error, url, dest
+      callback true, url, dest # TODO: Error is true?
 
 
 # Downloads an image file from a URL and opens it.
@@ -252,6 +251,35 @@ downloadToDisk = (url, dest, callback) ->
 requestImage = (url, dest, callback) ->
   downloadToDisk url, dest, (error, url, dest) ->
     jimp.read dest, callback
+
+
+downloadHits = (hits, callback, files) ->
+  if !files then files = [] # Initialize array for head recursion.
+  if hits.length == 0
+    callback null, files # Base case.
+  else
+    item = hits.pop()
+    dest = "./picksel_temp/#{item.id_hash}.jpg"
+    files.push {filename:dest, hash:item.id_hash}
+    downloadToDisk item.previewURL, dest, (error, url, dest) ->
+      if !error
+        downloadHits hits, callback, files # Recursively process.
+      else
+        callback true, null
+
+
+matchImage = (base, files, callback, percs) ->
+  if !percs then percs = [] # Initialize array for head recursion.
+  if files.length == 0
+    callback null, percs # Base case.
+  else
+    file = files.pop()
+    jimp.read file.filename, (error, img) ->
+      if error
+        callback error, null
+      else
+        percs.push {hash: file.hash, distance: jimp.distance(base, img)}
+        matchImage base, files, callback, percs
 
 
 # Tries to derive the hash ID of the image with the given numeric ID.
@@ -277,30 +305,13 @@ idToHashId = (id, callback) ->
                   if error
                     callback error, null # Couldn't create folder.
                   else
-                    files = []
-                    getFile = (item, callback) ->
-                      req = request item.previewURL
-                      dest = "./picksel_temp/#{item.id_hash}.jpg"
-                      files.push {filename:dest, hash:item.id_hash}
-                      stream = req.pipe fs.createWriteStream(dest)
-                      stream.on 'close', callback
-                    onGotAllFiles = () ->
-                      percs = []
-                      perc = (file, callback) ->
-                        jimp.read file.filename, (error, img) ->
-                          if error
-                            callback error
-                          else
-                            perc =
-                              hash: file.hash
-                              distance: jimp.distance base, img
-                            percs.push perc
-                            callback null
-                      percDone = (err) ->
-                        rimraf './picksel_temp/*'
+                    downloadHits body.hits, (err, files) ->
+                      matchImage base, files, (err, percs) ->
+                        rimraf './picksel_temp', fs, () ->
+                          #WUT
+                        rimraf './pickseltemp_base.jpg', fs, () ->
+                          #WUT
                         callback null, closestMatch(percs).hash
-                      async.eachSeries files, perc, percDone
-                    async.eachSeries body.hits, getFile, onGotAllFiles
             else
               callback error, null # Error during search.
     else
